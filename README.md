@@ -2,7 +2,7 @@
 
 **GallaGyan** (formerly India Finance) is a high-performance, real-time stock analysis platform designed for the Indian market (NSE/BSE). It combines the wisdom of traditional Marwari finance (*Galla* = Cash Box, *Gyan* = Knowledge) with cutting-edge tech.
 
-🚀 **Live Demo:** [Running Locally on http://localhost:3000](http://localhost:3000)
+🚀 **Live Demo:** [https://gallagyan.xyz](https://gallagyan.xyz)
 
 ---
 
@@ -27,14 +27,17 @@
 - **Meta Optimization:** Comprehensive OpenGraph, Twitter Card, and Keyword-rich metadata for finance-specific ranking.
 - **Market Intelligence Section:** A dedicated, semantic-rich section to boost crawler indexing for Indian market queries.
 
-### 5. 🛡️ Security & Infrastructure
-- **SSH Deployment Keys:** Generated secure Ed25519 SSH keys for safe server communication.
-- **Security Headers:** Hardened Next.js with HSTS, CSP, and XSS protection headers.
-- **SEBI Disclaimer:** Clear educational purpose disclosures.
+### 5. 🛡️ Production & Infrastructure
+- **Cloud Ready:** Decoupled frontend/backend URLs for production deployment.
+- **Domain:** Successfully registered and configured `gallagyan.xyz`.
+- **Requirements:** Auto-generated `requirements.txt` and deployment `PLAN.MD`.
+- **Security:** Hardened Next.js with HSTS, CSP, and XSS protection headers.
 
 ---
 
-## 🚀 How to Run Locally
+## 🚀 Deployment & Local Setup
+
+See the [PLAN.MD](./PLAN.MD) for full production deployment instructions on Render and Vercel.
 
 ### Prerequisites
 - Node.js 18+
@@ -60,7 +63,6 @@ npm run dev
 ---
 
 ## 🔮 Future Roadmap (Phase 2)
-- [ ] **Deployment:** Setup on Hetzner or DigitalOcean using the generated SSH keys.
 - [ ] **Supabase Integration:** Cloud sync for Watchlist and User Accounts.
 - [ ] **Portfolio Tracker:** Add "Buy Price" and "Quantity" to track real-time P&L.
 - [ ] **Option Chain:** Add F&O data for Nifty/BankNifty.
