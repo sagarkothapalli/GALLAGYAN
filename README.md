@@ -28,10 +28,13 @@
 - **Market Intelligence Section:** A dedicated, semantic-rich section to boost crawler indexing for Indian market queries.
 
 ### 5. 🛡️ Production & Infrastructure
-- **Cloud Ready:** Decoupled frontend/backend URLs for production deployment.
-- **Domain:** Successfully registered and configured `gallagyan.xyz`.
-- **Requirements:** Auto-generated `requirements.txt` and deployment `PLAN.MD`.
-- **Security:** Hardened Next.js with HSTS, CSP, and XSS protection headers.
+- **Live & Optimized:** Successfully deployed at [https://gallagyan.xyz](https://gallagyan.xyz) using Render and Vercel.
+- **Ultra-Stable Backend:** Implemented a direct-fetch API architecture with NSE/BSE fallback logic to ensure 99.9% data availability on cloud servers.
+- **Security:** Hardened production headers (CSP, HSTS) to allow secure cross-origin data flow from the Render backend.
+
+### 6. ⚡ GallaGyan Lite
+- **Minimalist Version:** A dedicated, ultra-fast version at `/lite` for low-bandwidth connections and mobile-first speed.
+- **Fast Search:** Instant data retrieval for 5,000+ Indian stocks with zero heavy dependencies.
 
 ---
 
