@@ -42,24 +42,35 @@ def read_root(request: Request):
 def get_stock(ticker: str, request: Request):
     try:
         ticker = validate_ticker(ticker.upper())
-        # Try NSE first, then BSE
+        # Try NSE first
         yf_ticker = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO")) else f"{ticker}.NS"
         
         t = Ticker(yf_ticker)
-        # yahooquery returns data in a dict keyed by the symbol
-        price_data = t.price.get(yf_ticker, {})
-        summary_data = t.summary_detail.get(yf_ticker, {})
+        price_res = t.price
+        summary_res = t.summary_detail
         
-        if not price_data or isinstance(price_data, str):
-            # Try BSE fallback if NSE fails
-            if not ticker.endswith(".BO"):
-                yf_ticker = f"{ticker}.BO"
-                t = Ticker(yf_ticker)
-                price_data = t.price.get(yf_ticker, {})
-                summary_data = t.summary_detail.get(yf_ticker, {})
+        price_data = {}
+        summary_data = {}
+
+        if isinstance(price_res, dict) and yf_ticker in price_res:
+            price_data = price_res[yf_ticker]
+        
+        if isinstance(summary_res, dict) and yf_ticker in summary_res:
+            summary_data = summary_res[yf_ticker]
+
+        # BSE Fallback
+        if not price_data and not ticker.endswith(".BO") and not ticker.endswith(".NS"):
+            yf_ticker = f"{ticker}.BO"
+            t = Ticker(yf_ticker)
+            price_res = t.price
+            summary_res = t.summary_detail
+            if isinstance(price_res, dict) and yf_ticker in price_res:
+                price_data = price_res[yf_ticker]
+            if isinstance(summary_res, dict) and yf_ticker in summary_res:
+                summary_data = summary_res[yf_ticker]
 
         if not price_data or isinstance(price_data, str):
-            raise HTTPException(status_code=404, detail="Stock not found")
+            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
 
         current_price = price_data.get('regularMarketPrice', 0)
         previous_close = price_data.get('regularMarketPreviousClose', 0)
@@ -68,7 +79,7 @@ def get_stock(ticker: str, request: Request):
 
         return {
             "symbol": yf_ticker,
-            "name": price_data.get('longName', ticker),
+            "name": price_data.get('longName', price_data.get('shortName', ticker)),
             "price": current_price,
             "currency": price_data.get('currency', 'INR'),
             "change": round(change, 2),
@@ -77,7 +88,7 @@ def get_stock(ticker: str, request: Request):
             "low": price_data.get('regularMarketDayLow', 0),
             "open": price_data.get('regularMarketOpen', 0),
             "volume": price_data.get('regularMarketVolume', 0),
-            "market_cap": summary_data.get('marketCap', 0),
+            "market_cap": summary_data.get('marketCap', price_data.get('marketCap', 0)),
             "pe_ratio": summary_data.get('trailingPE', None),
             "fiftyTwoWeekHigh": summary_data.get('fiftyTwoWeekHigh', 0),
             "fiftyTwoWeekLow": summary_data.get('fiftyTwoWeekLow', 0),
@@ -98,14 +109,17 @@ def get_stock_history(ticker: str, request: Request, period: str = "1mo"):
         t = Ticker(yf_ticker)
         df = t.history(period=period)
         
-        if df.empty:
+        if df is None or (isinstance(df, dict) and not df) or (hasattr(df, 'empty') and df.empty):
             raise HTTPException(status_code=404, detail="No history found")
 
-        # yahooquery history returns a multi-index dataframe or a dict
-        # We need to handle it carefully
         history = []
-        # If it's a multi-index (Symbol, Date)
-        if hasattr(df, 'index') and len(df.index.names) > 1:
+        # yahooquery history can be a DataFrame or a dict
+        if isinstance(df, dict):
+            # If it's a dict, it's usually an error message or empty
+            raise HTTPException(status_code=404, detail="History not available")
+
+        # Handle MultiIndex or Single Index DataFrame
+        if len(df.index.names) > 1:
             for index, row in df.iterrows():
                 history.append({
                     "time": index[1].strftime('%Y-%m-%d'),
@@ -124,6 +138,8 @@ def get_stock_history(ticker: str, request: Request, period: str = "1mo"):
                     "close": round(row['close'], 2),
                 })
         return history
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"History Error: {e}")
         raise HTTPException(status_code=500, detail="History fetch failed")
@@ -176,6 +192,7 @@ TOP_STOCKS = [
     {"symbol": "ITC", "name": "ITC Limited"},
     {"symbol": "ZOMATO", "name": "Zomato Limited"},
     {"symbol": "IDFCFIRSTB", "name": "IDFC First Bank"},
+    {"symbol": "INDIANBANK", "name": "Indian Bank"},
 ]
 
 @app.get("/api/search/suggestions")
