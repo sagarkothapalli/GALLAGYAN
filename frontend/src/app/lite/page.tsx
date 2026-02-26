@@ -31,14 +31,19 @@ export default function LiteHome() {
     setLoading(true);
     setError('');
     try {
-      const cleanSymbol = symbol.trim().toUpperCase();
+      let cleanSymbol = symbol.trim().toUpperCase().replace(/\s+/g, '');
+      // Handle special cases just like main app
+      if (cleanSymbol === 'IDFC') cleanSymbol = 'IDFC'; // It will get .NS in backend if needed
+      if (cleanSymbol.includes('IDFCFIRST')) cleanSymbol = 'IDFCFIRSTB';
+
       const [stockRes, newsRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${cleanSymbol}`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${cleanSymbol}/news`)
       ]);
 
       if (!stockRes.ok) throw new Error('Stock not found');
-      setStock(await stockRes.json());
+      const data = await stockRes.json();
+      setStock(data);
       setNews(newsRes.ok ? await newsRes.json() : []);
     } catch (err: any) {
       setError(err.message);
