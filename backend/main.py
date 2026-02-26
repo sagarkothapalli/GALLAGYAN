@@ -42,10 +42,28 @@ def read_root(request: Request):
 def get_stock(ticker: str, request: Request):
     try:
         ticker = validate_ticker(ticker.upper())
-        yf_ticker = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO")) else f"{ticker}.NS"
-        stock = yf.Ticker(yf_ticker)
-        info = stock.info
+        # Try NSE first, then BSE if needed
+        suffixes = [".NS", ".BO"]
+        if ticker.endswith(".NS") or ticker.endswith(".BO"):
+            # If user provided suffix, only try that one
+            search_tickers = [ticker]
+        else:
+            search_tickers = [f"{ticker}{s}" for s in suffixes]
         
+        info = {}
+        found_ticker = ""
+        
+        for st in search_tickers:
+            stock = yf.Ticker(st)
+            info = stock.info
+            # Check if we got a valid response (Yahoo returns a dict with 'symbol' usually)
+            if info and info.get('regularMarketPrice') or info.get('currentPrice'):
+                found_ticker = st
+                break
+        
+        if not found_ticker:
+            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found on NSE or BSE")
+
         current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
         previous_close = info.get('previousClose', info.get('regularMarketPreviousClose', 0))
         change = current_price - previous_close
