@@ -119,7 +119,7 @@ export default function RootLayout({
                 "@type": "Person",
                 "name": "Anand Sagar"
               },
-              "description": "GallaGyan is India's premier educational dashboard for real-time NSE/BSE stock market analysis, combining traditional Marwari financial wisdom with modern technology."
+              "description": "GallaGyan is India's premier educational dashboard for real-time NSE/BSE stock market analysis, combining traditional Indian financial wisdom with modern technology."
             }),
           }}
         />

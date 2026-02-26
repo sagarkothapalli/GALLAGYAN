@@ -1,6 +1,6 @@
 # 💰 GallaGyan — Modern Indian Stock Market Dashboard
 
-**GallaGyan** (formerly India Finance) is a high-performance, real-time stock analysis platform designed for the Indian market (NSE/BSE). It combines the wisdom of traditional Marwari finance (*Galla* = Cash Box, *Gyan* = Knowledge) with cutting-edge tech.
+**GallaGyan** (formerly India Finance) is a high-performance, real-time stock analysis platform designed for the Indian market (NSE/BSE). It combines the wisdom of traditional Indian finance (*Galla* = Cash Box, *Gyan* = Knowledge) with cutting-edge tech.
 
 🚀 **Live Demo:** [https://gallagyan.xyz](https://gallagyan.xyz)
 

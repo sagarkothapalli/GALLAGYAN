@@ -325,7 +325,7 @@ export default function Home() {
               <div className="flex flex-col items-center justify-center py-20 bg-white/[0.01] border-2 border-dashed border-white/[0.05] rounded-[3rem] text-center">
                 <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl flex items-center justify-center mb-8 text-4xl font-black shadow-2xl shadow-blue-500/20 rotate-6">G</div>
                 <h3 className="text-3xl font-black text-gray-300 uppercase tracking-tighter">Enter the Treasury</h3>
-                <p className="text-gray-600 mt-3 max-w-sm mx-auto font-medium">Master the Marwari way of wealth. Search any NSE/BSE stock below.</p>
+                <p className="text-gray-600 mt-3 max-w-sm mx-auto font-medium">Master the art of Indian wealth. Search any NSE/BSE stock below.</p>
               </div>
 
               <div className="space-y-6 px-2">
@@ -357,7 +357,7 @@ export default function Home() {
                     </p>
                   </section>
                   <section className="space-y-3">
-                    <h4 className="text-xs font-black text-white uppercase tracking-widest">Marwari Wisdom</h4>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest">Market Wisdom</h4>
                     <p className="text-[11px] text-gray-500 leading-relaxed">
                       Inspired by traditional Indian bookkeeping (Galla), we prioritize risk management and 
                       "Danger" detection in market news feeds.
