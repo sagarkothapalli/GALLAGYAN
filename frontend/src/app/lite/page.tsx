@@ -46,6 +46,7 @@ export default function LiteHome() {
       setStock(data);
       setNews(newsRes.ok ? await newsRes.json() : []);
     } catch (err: any) {
+      console.error("Lite Fetch Error:", err);
       setError(err.message);
       setStock(null);
     } finally {
@@ -73,12 +74,45 @@ export default function LiteHome() {
         </button>
       </form>
 
-      {error && <p className="text-red-500 text-xs mb-4">Error: {error}</p>}
+      {error && (
+        <div className="bg-red-900/20 border border-red-500/50 p-3 mb-4">
+          <p className="text-red-500 text-xs font-bold">Error: {error}</p>
+          <p className="text-[8px] text-gray-500 mt-1 uppercase tracking-widest">Check browser console for details</p>
+        </div>
+      )}
+
+      {!stock && !loading && (
+        <div className="space-y-6">
+          <section className="border border-white/10 p-4">
+            <h3 className="text-[10px] text-gray-500 uppercase mb-4 tracking-widest">Suggested</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {['RELIANCE', 'TCS', 'IDFCFIRSTB', 'INDIANBANK', 'ZOMATO', 'PAYTM'].map(s => (
+                <button 
+                  key={s} 
+                  onClick={() => { setTicker(s); fetchStock(s); }}
+                  className="border border-white/20 px-3 py-2 text-[10px] text-left hover:bg-white/5 uppercase"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+          <div className="py-10 text-center opacity-30">
+            <p className="text-[10px] italic">[SEARCH OR SELECT A SYMBOL]</p>
+          </div>
+        </div>
+      )}
 
       {stock && (
-        <div className="space-y-6">
-          <section className="border border-white/20 p-4">
-            <h2 className="text-lg font-bold">{stock.name}</h2>
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <section className="border border-white/20 p-4 bg-white/5">
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-lg font-bold leading-tight">{stock.name}</h2>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">{stock.symbol}</p>
+              </div>
+              <button onClick={() => setStock(null)} className="text-[10px] text-gray-500 hover:text-white uppercase">[Clear]</button>
+            </div>
             <p className="text-2xl mt-2">₹{stock.price.toLocaleString('en-IN')}</p>
             <p className={`text-sm mt-1 ${stock.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} ({stock.percent_change.toFixed(2)}%)
