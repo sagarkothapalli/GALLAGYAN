@@ -53,7 +53,6 @@ def read_root(request: Request):
 def get_stock(ticker: str, request: Request):
     try:
         ticker = validate_ticker(ticker.upper())
-        # Try NSE first, then BSE if needed
         suffixes = [".NS", ".BO"]
         if ticker.endswith(".NS") or ticker.endswith(".BO"):
             search_tickers = [ticker]
@@ -64,11 +63,31 @@ def get_stock(ticker: str, request: Request):
         found_ticker = ""
         
         for st in search_tickers:
-            stock = yf.Ticker(st, session=session)
-            info = stock.info
-            if info and (info.get('regularMarketPrice') or info.get('currentPrice')):
-                found_ticker = st
-                break
+            try:
+                stock = yf.Ticker(st, session=session)
+                # Try fetching multiple ways to bypass blocks
+                info = stock.info
+                if info and (info.get('regularMarketPrice') or info.get('currentPrice')):
+                    found_ticker = st
+                    break
+                
+                # Fallback: Try fast_info if .info is blocked
+                fast = stock.fast_info
+                if fast and fast.get('last_price'):
+                    info = {
+                        'currentPrice': fast['last_price'],
+                        'longName': ticker,
+                        'currency': 'INR',
+                        'regularMarketPreviousClose': fast.get('previous_close', 0),
+                        'dayHigh': fast.get('day_high', 0),
+                        'dayLow': fast.get('day_low', 0),
+                        'volume': fast.get('last_volume', 0),
+                        'marketCap': fast.get('market_cap', 0)
+                    }
+                    found_ticker = st
+                    break
+            except:
+                continue
         
         if not found_ticker:
             raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
