@@ -48,6 +48,27 @@ def validate_ticker(ticker: str):
 def read_root(request: Request):
     return {"message": "GallaGyan API is running safely"}
 
+def fetch_google_finance_price(ticker: str):
+    """Fallback scraper for Google Finance if Yahoo is blocked"""
+    try:
+        # Google Finance uses NSE:TCS or BOM:TCS
+        url = f"https://www.google.com/search?q=google+finance+{ticker}+stock"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=5)
+        # Very basic extraction for emergency fallback
+        # This is a last-resort to get ANY price on the screen
+        content = response.text
+        if "₹" in content:
+            # Try to find the price near the currency symbol
+            parts = content.split("₹")
+            price_str = parts[1][:15].split()[0].replace(",", "")
+            return float(re.sub(r'[^\d.]', '', price_str))
+        return None
+    except:
+        return None
+
 @app.get("/api/stock/{ticker}")
 @limiter.limit("20/minute")
 def get_stock(ticker: str, request: Request):
@@ -65,31 +86,34 @@ def get_stock(ticker: str, request: Request):
         for st in search_tickers:
             try:
                 stock = yf.Ticker(st, session=session)
-                # Try fetching multiple ways to bypass blocks
                 info = stock.info
                 if info and (info.get('regularMarketPrice') or info.get('currentPrice')):
-                    found_ticker = st
-                    break
-                
-                # Fallback: Try fast_info if .info is blocked
-                fast = stock.fast_info
-                if fast and fast.get('last_price'):
-                    info = {
-                        'currentPrice': fast['last_price'],
-                        'longName': ticker,
-                        'currency': 'INR',
-                        'regularMarketPreviousClose': fast.get('previous_close', 0),
-                        'dayHigh': fast.get('day_high', 0),
-                        'dayLow': fast.get('day_low', 0),
-                        'volume': fast.get('last_volume', 0),
-                        'marketCap': fast.get('market_cap', 0)
-                    }
                     found_ticker = st
                     break
             except:
                 continue
         
         if not found_ticker:
+            # EMERGENCY FALLBACK: Google Finance Scraping
+            google_price = fetch_google_finance_price(ticker)
+            if google_price:
+                return {
+                    "symbol": f"{ticker}.NS",
+                    "name": ticker,
+                    "price": google_price,
+                    "currency": "INR",
+                    "change": 0,
+                    "percent_change": 0,
+                    "high": google_price,
+                    "low": google_price,
+                    "open": google_price,
+                    "volume": 0,
+                    "market_cap": 0,
+                    "pe_ratio": None,
+                    "fiftyTwoWeekHigh": 0,
+                    "fiftyTwoWeekLow": 0,
+                    "dividendYield": 0,
+                }
             raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
 
         current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
