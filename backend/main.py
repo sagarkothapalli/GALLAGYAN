@@ -11,6 +11,17 @@ from datetime import datetime
 import time
 import urllib.parse
 
+import requests
+from datetime import datetime
+import time
+import urllib.parse
+
+# Setup Session for yfinance to avoid getting blocked
+session = requests.Session()
+session.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+})
+
 # Initialize Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
@@ -45,7 +56,6 @@ def get_stock(ticker: str, request: Request):
         # Try NSE first, then BSE if needed
         suffixes = [".NS", ".BO"]
         if ticker.endswith(".NS") or ticker.endswith(".BO"):
-            # If user provided suffix, only try that one
             search_tickers = [ticker]
         else:
             search_tickers = [f"{ticker}{s}" for s in suffixes]
@@ -54,15 +64,14 @@ def get_stock(ticker: str, request: Request):
         found_ticker = ""
         
         for st in search_tickers:
-            stock = yf.Ticker(st)
+            stock = yf.Ticker(st, session=session)
             info = stock.info
-            # Check if we got a valid response (Yahoo returns a dict with 'symbol' usually)
-            if info and info.get('regularMarketPrice') or info.get('currentPrice'):
+            if info and (info.get('regularMarketPrice') or info.get('currentPrice')):
                 found_ticker = st
                 break
         
         if not found_ticker:
-            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found on NSE or BSE")
+            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
 
         current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
         previous_close = info.get('previousClose', info.get('regularMarketPreviousClose', 0))
@@ -96,7 +105,7 @@ def get_stock_history(ticker: str, request: Request, period: str = "1mo"):
     try:
         ticker = validate_ticker(ticker.upper())
         yf_ticker = ticker if (ticker.endswith(".NS") or ticker.endswith(".BO")) else f"{ticker}.NS"
-        stock = yf.Ticker(yf_ticker)
+        stock = yf.Ticker(yf_ticker, session=session)
         df = stock.history(period=period)
         
         if df.empty:
