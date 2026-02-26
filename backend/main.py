@@ -11,11 +11,6 @@ from datetime import datetime
 import time
 import urllib.parse
 
-import requests
-from datetime import datetime
-import time
-import urllib.parse
-
 # Setup Session for yfinance to avoid getting blocked
 session = requests.Session()
 session.headers.update({
@@ -51,23 +46,17 @@ def read_root(request: Request):
 def fetch_google_finance_price(ticker: str):
     """Fallback scraper for Google Finance if Yahoo is blocked"""
     try:
-        # Google Finance uses NSE:TCS or BOM:TCS
         url = f"https://www.google.com/search?q=google+finance+{ticker}+stock"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=5)
-        # Very basic extraction for emergency fallback
-        # This is a last-resort to get ANY price on the screen
         content = response.text
         if "₹" in content:
-            # Try to find the price near the currency symbol
             parts = content.split("₹")
             price_str = parts[1][:15].split()[0].replace(",", "")
             return float(re.sub(r'[^\d.]', '', price_str))
-        return None
     except:
-        return None
+        pass
+    return None
 
 @app.get("/api/stock/{ticker}")
 @limiter.limit("20/minute")
@@ -75,26 +64,26 @@ def get_stock(ticker: str, request: Request):
     try:
         ticker = validate_ticker(ticker.upper())
         suffixes = [".NS", ".BO"]
-        if ticker.endswith(".NS") or ticker.endswith(".BO"):
-            search_tickers = [ticker]
-        else:
-            search_tickers = [f"{ticker}{s}" for s in suffixes]
         
-        info = {}
-        found_ticker = ""
+        search_tickers = [ticker]
+        if not (ticker.endswith(".NS") or ticker.endswith(".BO")):
+            search_tickers = [f"{ticker}{s}" for s in suffixes] + [ticker]
+        
+        info = None
+        used_ticker = ""
         
         for st in search_tickers:
             try:
                 stock = yf.Ticker(st, session=session)
                 info = stock.info
                 if info and (info.get('regularMarketPrice') or info.get('currentPrice')):
-                    found_ticker = st
+                    used_ticker = st
                     break
             except:
                 continue
         
-        if not found_ticker:
-            # EMERGENCY FALLBACK: Google Finance Scraping
+        # If Yahoo fails, try Google fallback
+        if not used_ticker:
             google_price = fetch_google_finance_price(ticker)
             if google_price:
                 return {
@@ -114,7 +103,7 @@ def get_stock(ticker: str, request: Request):
                     "fiftyTwoWeekLow": 0,
                     "dividendYield": 0,
                 }
-            raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
+            raise HTTPException(status_code=404, detail="Stock not found")
 
         current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
         previous_close = info.get('previousClose', info.get('regularMarketPreviousClose', 0))
@@ -122,7 +111,7 @@ def get_stock(ticker: str, request: Request):
         percent_change = (change / previous_close) * 100 if previous_close else 0
 
         return {
-            "symbol": yf_ticker,
+            "symbol": used_ticker,
             "name": info.get('longName', ticker),
             "price": current_price,
             "currency": info.get('currency', 'INR'),
@@ -138,9 +127,11 @@ def get_stock(ticker: str, request: Request):
             "fiftyTwoWeekLow": info.get('fiftyTwoWeekLow', 0),
             "dividendYield": info.get('dividendYield', 0),
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error fetching {ticker}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch stock data")
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/api/stock/{ticker}/history")
 @limiter.limit("10/minute")
@@ -165,44 +156,31 @@ def get_stock_history(ticker: str, request: Request, period: str = "1mo"):
             })
         return history
     except Exception as e:
-        print(f"Error fetching history for {ticker}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch history")
+        raise HTTPException(status_code=500, detail="History fetch failed")
 
 def fetch_google_news(query: str):
     try:
         search_query = urllib.parse.quote(query)
         url = f"https://news.google.com/rss/search?q={search_query}+India&hl=en-IN&gl=IN&ceid=IN:en"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, timeout=10)
         root = ET.fromstring(response.content)
-        
         news_items = []
         for item in root.findall('.//item')[:15]:
             title = item.find('title').text
             link = item.find('link').text
             pub_date = item.find('pubDate').text
             source = item.find('source').text
-            
-            # Convert pub_date to timestamp
-            # Format: Wed, 25 Feb 2026 10:30:00 GMT
             try:
                 dt = datetime.strptime(pub_date, '%a, %d %b %Y %H:%M:%S %Z')
                 ts = int(time.mktime(dt.timetuple()))
             except:
                 ts = int(time.time())
-
             news_items.append({
-                "title": title,
-                "publisher": source,
-                "link": link,
-                "providerPublishTime": ts,
-                "thumbnail": None
+                "title": title, "publisher": source, "link": link, "providerPublishTime": ts, "thumbnail": None
             })
         return news_items
-    except Exception as e:
-        print(f"News fetch error: {e}")
+    except:
         return []
 
 @app.get("/api/stock/{ticker}/news")
@@ -217,7 +195,6 @@ def get_stock_news(ticker: str, request: Request):
 def get_market_news(request: Request):
     return fetch_google_news("Indian stock market breaking news")
 
-# Top 50 NSE Stocks for Autocomplete
 TOP_STOCKS = [
     {"symbol": "RELIANCE", "name": "Reliance Industries"},
     {"symbol": "TCS", "name": "Tata Consultancy Services"},
@@ -226,57 +203,17 @@ TOP_STOCKS = [
     {"symbol": "BHARTIARTL", "name": "Bharti Airtel"},
     {"symbol": "SBIN", "name": "State Bank of India"},
     {"symbol": "INFY", "name": "Infosys"},
-    {"symbol": "LICI", "name": "LIC of India"},
     {"symbol": "ITC", "name": "ITC Limited"},
-    {"symbol": "HINDUNILVR", "name": "Hindustan Unilever"},
     {"symbol": "LT", "name": "Larsen & Toubro"},
-    {"symbol": "BAJFINANCE", "name": "Bajaj Finance"},
-    {"symbol": "HCLTECH", "name": "HCL Technologies"},
-    {"symbol": "MARUTI", "name": "Maruti Suzuki"},
-    {"symbol": "SUNPHARMA", "name": "Sun Pharma"},
-    {"symbol": "ADANIENT", "name": "Adani Enterprises"},
-    {"symbol": "KOTAKBANK", "name": "Kotak Mahindra Bank"},
-    {"symbol": "TITAN", "name": "Titan Company"},
-    {"symbol": "ULTRACEMCO", "name": "UltraTech Cement"},
-    {"symbol": "AXISBANK", "name": "Axis Bank"},
-    {"symbol": "ADANIPORTS", "name": "Adani Ports"},
-    {"symbol": "ASIANPAINT", "name": "Asian Paints"},
-    {"symbol": "COALINDIA", "name": "Coal India"},
-    {"symbol": "WIPRO", "name": "Wipro"},
-    {"symbol": "BAJAJFINSV", "name": "Bajaj Finserv"},
-    {"symbol": "ONGC", "name": "ONGC"},
-    {"symbol": "JSWSTEEL", "name": "JSW Steel"},
-    {"symbol": "NTPC", "name": "NTPC"},
-    {"symbol": "M&M", "name": "Mahindra & Mahindra"},
-    {"symbol": "TATASTEEL", "name": "Tata Steel"},
-    {"symbol": "POWERGRID", "name": "Power Grid"},
-    {"symbol": "ADANIPOWER", "name": "Adani Power"},
-    {"symbol": "TATAMOTORS", "name": "Tata Motors"},
-    {"symbol": "INDUSINDBK", "name": "IndusInd Bank"},
-    {"symbol": "BAJAJ-AUTO", "name": "Bajaj Auto"},
-    {"symbol": "NESTLEIND", "name": "Nestle India"},
-    {"symbol": "GRASIM", "name": "Grasim Industries"},
-    {"symbol": "JIOFIN", "name": "Jio Financial Services"},
-    {"symbol": "HAL", "name": "Hindustan Aeronautics"},
-    {"symbol": "DLF", "name": "DLF Limited"},
-    {"symbol": "IDFCFIRSTB", "name": "IDFC First Bank"},
     {"symbol": "ZOMATO", "name": "Zomato Limited"},
-    {"symbol": "PAYTM", "name": "Paytm (One97)"},
-    {"symbol": "ADANIGREEN", "name": "Adani Green Energy"},
-    {"symbol": "BEL", "name": "Bharat Electronics"},
-    {"symbol": "SBILIFE", "name": "SBI Life Insurance"},
+    {"symbol": "IDFCFIRSTB", "name": "IDFC First Bank"},
 ]
 
 @app.get("/api/search/suggestions")
 def get_suggestions(query: str = ""):
-    if not query:
-        return []
+    if not query: return []
     query = query.upper()
-    matches = []
-    for s in TOP_STOCKS:
-        if query in s["symbol"] or query in s["name"].upper():
-            matches.append(s)
-    return matches[:8] # Return top 8 matches
+    return [s for s in TOP_STOCKS if query in s["symbol"] or query in s["name"].upper()][:8]
 
 if __name__ == "__main__":
     import uvicorn
