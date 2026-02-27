@@ -47,6 +47,13 @@ interface Suggestion {
   name: string;
 }
 
+interface PortfolioItem {
+  symbol: string;
+  name: string;
+  buyPrice: number;
+  quantity: number;
+}
+
 const QUICK_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ETERNAL'];
 
 function formatTime(timestamp: number) {
@@ -66,19 +73,25 @@ export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [marketNews, setMarketNews] = useState<NewsItem[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [isBackendLive, setIsBackendLive] = useState(true);
   const [loading, setLoading] = useState(false);
   const [bgLoading, setBgLoading] = useState(false);
   const [error, setError] = useState('');
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chart' | 'financials' | 'news'>('chart');
+  const [activeTab, setActiveTab] = useState<'chart' | 'financials' | 'news' | 'portfolio'>('chart');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [portfolioInput, setPortfolioInput] = useState({ buyPrice: '', quantity: '' });
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
-    const saved = localStorage.getItem('watchlist');
-    if (saved) { try { setWatchlist(JSON.parse(saved)); } catch (e) {} }
+    const savedWatchlist = localStorage.getItem('watchlist');
+    const savedPortfolio = localStorage.getItem('portfolio');
+    if (savedWatchlist) { try { setWatchlist(JSON.parse(savedWatchlist)); } catch (e) {} }
+    if (savedPortfolio) { try { setPortfolio(JSON.parse(savedPortfolio)); } catch (e) {} }
+    
+    checkHealth();
     fetchMarketNews();
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -90,7 +103,12 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => { if (isMounted) localStorage.setItem('watchlist', JSON.stringify(watchlist)); }, [watchlist, isMounted]);
+  useEffect(() => { 
+    if (isMounted) {
+      localStorage.setItem('watchlist', JSON.stringify(watchlist));
+      localStorage.setItem('portfolio', JSON.stringify(portfolio));
+    }
+  }, [watchlist, portfolio, isMounted]);
 
   useEffect(() => {
     if (stock) {
@@ -109,9 +127,20 @@ export default function Home() {
         } else {
             fetchMarketNews();
         }
+        checkHealth();
     }, 30000);
     return () => clearInterval(interval);
   }, [stock, isMounted]);
+
+  const checkHealth = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${baseUrl}/api/health`);
+      setIsBackendLive(res.ok);
+    } catch (e) {
+      setIsBackendLive(false);
+    }
+  };
 
   const refreshCurrentStock = async (symbol: string) => {
     try {
@@ -193,11 +222,35 @@ export default function Home() {
     setWatchlist(prev => prev.includes(clean) ? prev.filter(s => s !== clean) : [...prev, clean]);
   };
 
+  const addToPortfolio = () => {
+    if (!stock || !portfolioInput.buyPrice || !portfolioInput.quantity) return;
+    const newItem: PortfolioItem = {
+      symbol: stock.symbol.replace('.NS', '').replace('.BO', ''),
+      name: stock.name,
+      buyPrice: parseFloat(portfolioInput.buyPrice),
+      quantity: parseFloat(portfolioInput.quantity)
+    };
+    setPortfolio(prev => [...prev.filter(i => i.symbol !== newItem.symbol), newItem]);
+    setPortfolioInput({ buyPrice: '', quantity: '' });
+  };
+
+  const removeFromPortfolio = (symbol: string) => {
+    setPortfolio(prev => prev.filter(i => i.symbol !== symbol));
+  };
+
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
   if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 font-sans selection:bg-blue-100 overflow-x-hidden">
       
+      {!isBackendLive && (
+        <div className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-[0.3em] py-2 text-center animate-pulse sticky top-0 z-[60]">
+          System Offline: Connecting to GallaGyan Treasury...
+        </div>
+      )}
+
       {/* Dynamic Progress Bar for Background Loading */}
       {bgLoading && <div className="fixed top-0 left-0 h-1 bg-blue-600 z-[100] animate-progress-fast shadow-[0_0_10px_rgba(37,99,235,0.5)]" />}
 
@@ -313,7 +366,7 @@ export default function Home() {
 
               <div className="space-y-6">
                 <div className="flex p-1.5 bg-white border border-slate-200/60 rounded-2xl w-full md:w-max shadow-sm overflow-hidden">
-                  {(['chart', 'financials', 'news'] as const).map((tab) => (
+                  {(['chart', 'financials', 'news', 'portfolio'] as const).map((tab) => (
                     <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 md:w-32 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>
                   ))}
                 </div>
@@ -343,6 +396,69 @@ export default function Home() {
                         {news.length > 0 ? news.map((item, idx) => (
                           <NewsCard key={idx} item={item} />
                         )) : bgLoading ? Array(6).fill(0).map((_, i) => <SkeletonNewsCard key={i} />) : <p className="col-span-full text-center text-slate-400 py-10 text-sm font-bold">No recent news available.</p>}
+                      </div>
+                    </div>
+                  )}
+                  {activeTab === 'portfolio' && (
+                    <div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm space-y-8">
+                      <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-8 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-xl font-bold text-slate-900">Portfolio Tracker</h3>
+                          <p className="text-xs text-slate-400 font-medium">Add {stock?.name} to your holdings</p>
+                        </div>
+                        <div className="flex gap-3">
+                          <input 
+                            type="number" 
+                            placeholder="Buy Price" 
+                            value={portfolioInput.buyPrice}
+                            onChange={e => setPortfolioInput(prev => ({ ...prev, buyPrice: e.target.value }))}
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
+                          />
+                          <input 
+                            type="number" 
+                            placeholder="Qty" 
+                            value={portfolioInput.quantity}
+                            onChange={e => setPortfolioInput(prev => ({ ...prev, quantity: e.target.value }))}
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500/10"
+                          />
+                          <button onClick={addToPortfolio} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">Add</button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {portfolio.length === 0 ? (
+                          <p className="text-center py-10 text-slate-400 text-sm font-medium italic">Your portfolio is currently empty.</p>
+                        ) : (
+                          portfolio.map(item => {
+                            const isCurrent = item.symbol === stock?.symbol.replace('.NS', '').replace('.BO', '');
+                            const currentPrice = isCurrent ? stock.price : item.buyPrice;
+                            const pnl = (currentPrice - item.buyPrice) * item.quantity;
+                            const pnlPercent = ((currentPrice - item.buyPrice) / item.buyPrice) * 100;
+                            
+                            return (
+                              <div key={item.symbol} className="flex justify-between items-center bg-slate-50/50 p-6 rounded-3xl border border-slate-100 group transition-all hover:bg-white hover:shadow-md">
+                                <div className="flex items-center gap-4">
+                                   <div className="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-bold text-xs text-slate-400">{item.symbol[0]}</div>
+                                   <div>
+                                      <p className="text-sm font-bold text-slate-900">{item.symbol}</p>
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase">{item.quantity} Shares @ ₹{item.buyPrice}</p>
+                                   </div>
+                                </div>
+                                <div className="text-right flex items-center gap-6">
+                                   <div>
+                                      <p className={`text-sm font-black ${pnl >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                        {pnl >= 0 ? '+' : ''}₹{pnl.toLocaleString('en-IN')}
+                                      </p>
+                                      <p className={`text-[10px] font-bold ${pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        {pnlPercent.toFixed(2)}%
+                                      </p>
+                                   </div>
+                                   <button onClick={() => removeFromPortfolio(item.symbol)} className="text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">✕</button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
                   )}
@@ -422,8 +538,8 @@ export default function Home() {
             <a href="/privacy" className="hover:text-slate-900 cursor-pointer transition-colors">Privacy</a>
           </div>
         </div>
-        <p className="max-w-3xl mx-auto leading-relaxed text-[11px] text-slate-400 font-medium">
-          GallaGyan is an educational data visualizer. Market data is provided for research and informational purposes only. No financial advice is intended.
+        <p className="max-w-3xl mx-auto leading-relaxed text-[11px] text-slate-400 font-medium italic">
+          Disclaimer: GallaGyan is a technical analysis playground for educational growth. Market data is provided for research and informational purposes only. No financial advice is intended.
         </p>
       </footer>
 
@@ -432,6 +548,7 @@ export default function Home() {
         .animate-progress-fast { animation: progress 2s cubic-bezier(0.1, 0, 0.1, 1) infinite; }
         .animate-in { animation: fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        body { background-color: #fcfcfd; }
       `}</style>
     </div>
   );

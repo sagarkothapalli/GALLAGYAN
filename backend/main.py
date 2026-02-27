@@ -52,109 +52,16 @@ USER_AGENTS = [
 def get_random_ua():
     return random.choice(USER_AGENTS)
 
-@app.get("/")
-@limiter.limit("10/minute")
-async def read_root(request: Request):
-    return {"message": "GallaGyan API is active", "status": "secure"}
-
-async def fetch_stock_data(ticker_symbol: str):
-    if ticker_symbol in stock_cache:
-        return stock_cache[ticker_symbol]
-
-    symbols_to_try = []
-    if "." not in ticker_symbol:
-        symbols_to_try = [f"{ticker_symbol}.NS", f"{ticker_symbol}.BO"]
-    else:
-        symbols_to_try = [ticker_symbol]
-
-    for sym in symbols_to_try:
-        t = Ticker(sym)
-        price_data = t.price
-        
-        if isinstance(price_data, dict) and sym in price_data and isinstance(price_data[sym], dict):
-            p = price_data[sym]
-            summary = t.summary_detail.get(sym, {})
-            
-            if not p.get('regularMarketPrice'):
-                continue
-                
-            res = {
-                "symbol": sym,
-                "name": p.get('longName') or p.get('shortName') or ticker_symbol,
-                "price": p.get('regularMarketPrice'),
-                "currency": p.get('currency', 'INR'),
-                "change": round(p.get('regularMarketChange', 0), 2),
-                "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2),
-                "high": p.get('regularMarketDayHigh'),
-                "low": p.get('regularMarketDayLow'),
-                "open": p.get('regularMarketOpen'),
-                "volume": p.get('regularMarketVolume', 0),
-                "market_cap": p.get('marketCap', 0),
-                "pe_ratio": summary.get('trailingPE'),
-                "fiftyTwoWeekHigh": summary.get('fiftyTwoWeekHigh'),
-                "fiftyTwoWeekLow": summary.get('fiftyTwoWeekLow'),
-                "dividendYield": summary.get('dividendYield', 0)
-            }
-            stock_cache[ticker_symbol] = res
-            return res
-            
-    return None
-
-@app.get("/api/stock/{ticker}")
-@limiter.limit("60/minute")
-async def get_stock(request: Request, ticker: str):
-    ticker = ticker.upper().strip()
-    data = await fetch_stock_data(ticker)
-    if data:
-        return data
-    raise HTTPException(status_code=404, detail="Stock not found")
-
-@app.get("/api/stock/{ticker}/history")
-@limiter.limit("60/minute")
-async def get_stock_history(request: Request, ticker: str, period: str = "1mo"):
-    ticker = ticker.upper().strip()
-    cache_key = f"{ticker}_history_{period}"
-    
-    if cache_key in history_cache:
-        return history_cache[cache_key]
-
-    sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym)
-        df = t.history(period=period, interval="1d")
-        
-        if df.empty and "." not in ticker:
-            sym = f"{ticker}.BO"
-            t = Ticker(sym)
-            df = t.history(period=period, interval="1d")
-
-        if df.empty:
-            return []
-
-        history = []
-        if hasattr(df.index, 'levels'):
-            for (symbol, date), row in df.iterrows():
-                history.append({
-                    "time": date.strftime('%Y-%m-%d'),
-                    "open": round(row['open'], 2),
-                    "high": round(row['high'], 2),
-                    "low": round(row['low'], 2),
-                    "close": round(row['close'], 2),
-                })
-        else:
-            for date, row in df.iterrows():
-                history.append({
-                    "time": date.strftime('%Y-%m-%d'),
-                    "open": round(row['open'], 2),
-                    "high": round(row['high'], 2),
-                    "low": round(row['low'], 2),
-                    "close": round(row['close'], 2),
-                })
-        
-        history_cache[cache_key] = history
-        return history
-    except:
-        return []
+@app.get("/api/health")
+async def health_check(request: Request):
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "cache_size": {
+            "stocks": len(stock_cache),
+            "news": len(news_cache)
+        }
+    }
 
 @app.get("/api/stock/{ticker}/news")
 @limiter.limit("30/minute")
@@ -164,26 +71,32 @@ async def get_stock_news(request: Request, ticker: str):
         return news_cache[ticker]
         
     try:
-        query = f"{ticker} stock India"
+        # Use a more descriptive query for better results
+        query = f"{ticker} stock price news India"
         url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
         
-        async with httpx.AsyncClient(headers={'User-Agent': get_random_ua()}) as client:
+        async with httpx.AsyncClient(headers={'User-Agent': get_random_ua()}, follow_redirects=True) as client:
             res = await client.get(url, timeout=10)
+            if res.status_code != 200:
+                return [] # Return empty if blocked
             
         root = ET.fromstring(res.content)
         items = []
         for item in root.findall('.//item')[:10]:
+            source = item.find('source')
             items.append({
                 "title": item.find('title').text, 
-                "publisher": item.find('source').text if item.find('source') is not None else "News", 
+                "publisher": source.text if source is not None else "Financial News", 
                 "link": item.find('link').text, 
                 "providerPublishTime": int(time.time()), 
                 "thumbnail": None
             })
             
-        news_cache[ticker] = items
+        if items:
+            news_cache[ticker] = items
         return items
-    except:
+    except Exception as e:
+        print(f"News error for {ticker}: {e}")
         return []
 
 @app.get("/api/market/news")
