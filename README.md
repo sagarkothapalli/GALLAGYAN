@@ -9,32 +9,29 @@
 ## 🌟 Features Completed (MVP Speedrun)
 
 ### 1. 📈 Real-Time Market Data
-- **Live Prices:** Fetches real-time data for 5,000+ NSE/BSE stocks.
-- **Advanced Stats:** Displays P/E Ratio, Market Cap (Cr), 52-Week High/Low, and Volume.
-- **Smart Ticker Search:** Handles spaces and exchange suffixes (`.NS`).
-- **Live Refresh:** Automatic polling system refreshes prices and news every 30 seconds without page reloads.
+- **Universal Search:** Search 5,000+ Indian stocks in real-time using `yahooquery` global search.
+- **Advanced Stats:** Correctly displays P/E Ratio, Market Cap (Cr), 52-Week High/Low.
+- **Progressive Loading:** Prices load instantly, while history and news stream in the background.
 
-### 2. 🕯️ Interactive Charts
-- **TradingView Style:** Integrated `lightweight-charts` for smooth candlestick visualization.
-- **Dynamic Titles:** Browser tab titles now update dynamically with live stock prices for better UX and SEO.
+### 2. 🕯️ Professional Visualization
+- **Lite Theme:** Modern, clean light-mode UI for better readability.
+- **Interactive Charts:** High-performance `lightweight-charts` with adaptive styling.
 
-### 3. 📰 Intelligent News Feed
-- **"Danger" Detection:** Highlights news containing "Scam", "Fraud", or "Crash" in **RED**.
-- **Constant Updates:** News feed stays fresh with background polling.
+### 3. 🛡️ Security & Reliability
+- **Rate Limiting:** Backend protection against abuse (via `slowapi`).
+- **CORS & CSP:** Hardened headers for secure data transmission.
+- **SSL Badge:** Visual trust confirmation for users.
 
-### 4. 🚀 SEO & Discovery (Elite Level)
-- **JSON-LD Structured Data:** Optimized with Organization, FinancialService, and SearchAction schemas for Google Rich Snippets.
-- **Meta Optimization:** Comprehensive OpenGraph, Twitter Card, and Keyword-rich metadata for finance-specific ranking.
-- **Market Intelligence Section:** A dedicated, semantic-rich section to boost crawler indexing for Indian market queries.
+### 4. ⚡ GallaGyan Lite & SEO
+- **Optimized Performance:** Drastically reduced loading times via backend caching.
+- **Contact:** Reach us at [contact@gallagyan.xyz](mailto:contact@gallagyan.xyz).
 
-### 5. 🛡️ Production & Infrastructure
-- **Live & Optimized:** Successfully deployed at [https://gallagyan.xyz](https://gallagyan.xyz) using Render and Vercel.
-- **Ultra-Stable Backend:** Implemented a direct-fetch API architecture with NSE/BSE fallback logic to ensure 99.9% data availability on cloud servers.
-- **Security:** Hardened production headers (CSP, HSTS) to allow secure cross-origin data flow from the Render backend.
+---
 
-### 6. ⚡ GallaGyan Lite
-- **Minimalist Version:** A dedicated, ultra-fast version at `/lite` for low-bandwidth connections and mobile-first speed.
-- **Fast Search:** Instant data retrieval for 5,000+ Indian stocks with zero heavy dependencies.
+## 🛠️ Current Status (Feb 2026)
+- **Backend:** Optimized FastAPI on Render (Using `yahooquery`).
+- **Frontend:** Next.js on Vercel with Progressive Hydration.
+- **Domain:** [https://gallagyan.xyz](https://gallagyan.xyz) (Active).
 
 ---
 
