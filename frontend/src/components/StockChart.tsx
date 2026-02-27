@@ -1,6 +1,6 @@
 'use client';
 
-import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
 import React, { useEffect, useRef } from 'react';
 
 interface ChartData {
@@ -9,6 +9,7 @@ interface ChartData {
   high: number;
   low: number;
   close: number;
+  volume?: number;
 }
 
 interface StockChartProps {
@@ -18,6 +19,7 @@ interface StockChartProps {
   showEMA9?: boolean;
   showEMA21?: boolean;
   showRSI?: boolean;
+  showVolume?: boolean;
   isDark?: boolean;
 }
 
@@ -64,7 +66,7 @@ const calculateRSI = (data: ChartData[], period: number = 14) => {
     return rsi;
 };
 
-export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false, isDark = false }: StockChartProps) => {
+export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false, showVolume = true, isDark = false }: StockChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -76,7 +78,7 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
     };
 
     const isMobile = window.innerWidth < 768;
-    const chartHeight = showRSI ? (isMobile ? 400 : 500) : (isMobile ? 300 : 400);
+    const chartHeight = (showRSI || showVolume) ? (isMobile ? 400 : 500) : (isMobile ? 300 : 400);
 
     const chart = createChart(chartContainerRef.current, {
       layout: { 
@@ -113,12 +115,30 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
         s.setData(calculateEMA(data, 21));
     }
 
+    if (showVolume) {
+        const volumeSeries = chart.addSeries(HistogramSeries, {
+            color: '#26a69a',
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'volume',
+        });
+        
+        chart.priceScale('volume').applyOptions({
+            scaleMargins: { top: 0.8, bottom: 0 },
+        });
+
+        volumeSeries.setData(data.map(d => ({
+            time: d.time,
+            value: d.volume || 0,
+            color: d.close >= d.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)'
+        })));
+    }
+
     if (showRSI && data.length > 14) {
         const rsiSeries = chart.addSeries(LineSeries, { 
             color: '#6366f1', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi',
         });
         chart.priceScale('rsi').applyOptions({
-            position: 'right', mode: 0, autoScale: false, scaleMargins: { top: 0.8, bottom: 0 },
+            position: 'right', mode: 0, autoScale: false, scaleMargins: { top: 0.1, bottom: 0.7 },
         });
         rsiSeries.setData(calculateRSI(data));
     }
@@ -127,7 +147,7 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
     chartRef.current = chart;
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
-  }, [data, showSMA20, showSMA50, showEMA9, showEMA21, showRSI, isDark]);
+  }, [data, showSMA20, showSMA50, showEMA9, showEMA21, showRSI, showVolume, isDark]);
 
   return <div className="w-full mt-6"><div ref={chartContainerRef} className="w-full" /></div>;
 };

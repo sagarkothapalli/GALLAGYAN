@@ -95,7 +95,14 @@ async def get_stock_history(request: Request, ticker: str, period: str = "1mo", 
         history = []; df = df.reset_index()
         for _, row in df.iterrows():
             date_val = row['date']; time_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') else str(date_val)
-            history.append({"time": time_str, "open": round(row['open'], 2), "high": round(row['high'], 2), "low": round(row['low'], 2), "close": round(row['close'], 2)})
+            history.append({
+                "time": time_str, 
+                "open": round(row['open'], 2), 
+                "high": round(row['high'], 2), 
+                "low": round(row['low'], 2), 
+                "close": round(row['close'], 2),
+                "volume": int(row.get('volume', 0))
+            })
         history_cache[cache_key] = history; return history
     except: return []
 
