@@ -18,6 +18,7 @@ interface StockChartProps {
   showEMA9?: boolean;
   showEMA21?: boolean;
   showRSI?: boolean;
+  isDark?: boolean;
 }
 
 const calculateSMA = (data: ChartData[], period: number) => {
@@ -45,30 +46,25 @@ const calculateRSI = (data: ChartData[], period: number = 14) => {
     if (data.length <= period) return [];
     const rsi = [];
     let gains = 0, losses = 0;
-
     for (let i = 1; i <= period; i++) {
         const diff = data[i].close - data[i - 1].close;
         if (diff >= 0) gains += diff; else losses -= diff;
     }
-
     let avgGain = gains / period;
     let avgLoss = losses / period;
-
     for (let i = period + 1; i < data.length; i++) {
         const diff = data[i].close - data[i - 1].close;
         const gain = diff >= 0 ? diff : 0;
         const loss = diff < 0 ? -diff : 0;
-
         avgGain = (avgGain * (period - 1) + gain) / period;
         avgLoss = (avgLoss * (period - 1) + loss) / period;
-
         const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
         rsi.push({ time: data[i].time, value: 100 - (100 / (1 + rs)) });
     }
     return rsi;
 };
 
-export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false }: StockChartProps) => {
+export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false, isDark = false }: StockChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -83,8 +79,14 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
     const chartHeight = showRSI ? (isMobile ? 400 : 500) : (isMobile ? 300 : 400);
 
     const chart = createChart(chartContainerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#64748b' },
-      grid: { vertLines: { color: '#f1f5f9' }, horzLines: { color: '#f1f5f9' } },
+      layout: { 
+        background: { type: ColorType.Solid, color: isDark ? '#0a0a0a' : '#ffffff' }, 
+        textColor: isDark ? '#94a3b8' : '#64748b' 
+      },
+      grid: { 
+        vertLines: { color: isDark ? '#1e293b' : '#f1f5f9' }, 
+        horzLines: { color: isDark ? '#1e293b' : '#f1f5f9' } 
+      },
       width: chartContainerRef.current.clientWidth,
       height: chartHeight,
     });
@@ -112,29 +114,20 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
     }
 
     if (showRSI && data.length > 14) {
-        const rsiData = calculateRSI(data);
         const rsiSeries = chart.addSeries(LineSeries, { 
-            color: '#6366f1', 
-            lineWidth: 2, 
-            title: 'RSI 14',
-            priceScaleId: 'rsi',
+            color: '#6366f1', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi',
         });
-        
         chart.priceScale('rsi').applyOptions({
-            position: 'right',
-            mode: 0,
-            autoScale: false,
-            scaleMargins: { top: 0.8, bottom: 0 },
+            position: 'right', mode: 0, autoScale: false, scaleMargins: { top: 0.8, bottom: 0 },
         });
-
-        rsiSeries.setData(rsiData);
+        rsiSeries.setData(calculateRSI(data));
     }
 
     chart.timeScale().fitContent();
     chartRef.current = chart;
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
-  }, [data, showSMA20, showSMA50, showEMA9, showEMA21, showRSI]);
+  }, [data, showSMA20, showSMA50, showEMA9, showEMA21, showRSI, isDark]);
 
   return <div className="w-full mt-6"><div ref={chartContainerRef} className="w-full" /></div>;
 };
