@@ -158,6 +158,39 @@ async def get_stock_history(request: Request, ticker: str, period: str = "1mo", 
         return history
     except: return []
 
+def analyze_sentiment(title: str):
+    bullish = ['buy', 'growth', 'profit', 'up', 'surge', 'high', 'positive', 'gain', 'expansion', 'dividend', 'acquisition', 'bull', 'jump']
+    bearish = ['sell', 'loss', 'down', 'crash', 'scam', 'fraud', 'negative', 'fall', 'penalty', 'investigation', 'debt', 'cut', 'drop', 'miss']
+    
+    t = title.lower()
+    score = 0
+    for w in bullish:
+        if w in t: score += 1
+    for w in bearish:
+        if w in t: score -= 1
+        
+    if score > 0: return "Bullish"
+    if score < 0: return "Bearish"
+    return "Neutral"
+
+@app.get("/api/stock/{ticker}/profile")
+@limiter.limit("20/minute")
+async def get_profile(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        p = t.summary_profile.get(sym, {})
+        return {
+            "sector": p.get('sector'),
+            "industry": p.get('industry'),
+            "summary": p.get('longBusinessSummary'),
+            "website": p.get('website'),
+            "employees": p.get('fullTimeEmployees')
+        }
+    except:
+        return {}
+
 @app.get("/api/stock/{ticker}/news")
 @limiter.limit("30/minute")
 async def get_stock_news(request: Request, ticker: str):
@@ -175,11 +208,13 @@ async def get_stock_news(request: Request, ticker: str):
         items = []
         for item in root.findall('.//item')[:10]:
             source = item.find('source')
+            title = item.find('title').text
             items.append({
-                "title": item.find('title').text, 
+                "title": title, 
                 "publisher": source.text if source is not None else "Financial News", 
                 "link": item.find('link').text, 
                 "providerPublishTime": int(time.time()), 
+                "sentiment": analyze_sentiment(title),
                 "thumbnail": None
             })
         if items: news_cache[ticker] = items
