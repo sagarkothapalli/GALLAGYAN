@@ -189,6 +189,28 @@ async def get_market_news(request: Request):
     overall = "Bullish" if bullish > bearish else "Bearish" if bearish > bullish else "Neutral"
     return {"articles": news, "sentiment": overall, "score": (bullish - bearish)}
 
+@app.get("/api/stock/{ticker}/calendar")
+@limiter.limit("20/minute")
+async def get_calendar(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        cal = t.calendar_events.get(sym, {})
+        earnings = cal.get('earnings', {})
+        
+        dates = earnings.get('earningsDate', [])
+        clean_date = dates[0] if dates else None
+        
+        return {
+            "earnings_date": clean_date,
+            "ex_dividend_date": cal.get('exDividendDate'),
+            "revenue_avg": earnings.get('revenueAverage'),
+            "eps_avg": earnings.get('earningsAverage')
+        }
+    except:
+        return {}
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
