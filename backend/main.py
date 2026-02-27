@@ -259,6 +259,43 @@ async def get_actions(request: Request, ticker: str):
     except:
         return {}
 
+@app.get("/api/stock/{ticker}/peers")
+@limiter.limit("20/minute")
+async def get_peers(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        # Recommendation Trends
+        trends = t.recommendation_trend
+        clean_trends = []
+        if trends is not None and not (isinstance(trends, dict) and not trends):
+            df = trends.reset_index()
+            # Get latest month
+            if not df.empty:
+                latest = df.iloc[0]
+                clean_trends = {
+                    "strong_buy": int(latest.get('strongBuy', 0)),
+                    "buy": int(latest.get('buy', 0)),
+                    "hold": int(latest.get('hold', 0)),
+                    "sell": int(latest.get('sell', 0)),
+                    "strong_sell": int(latest.get('strongSell', 0))
+                }
+
+        # Recommendations (Peers)
+        recs = t.recommendations
+        peers = []
+        if recs and sym in recs:
+            for item in recs[sym].get('recommendedSymbols', []):
+                peers.append({
+                    "symbol": item['symbol'].replace('.NS', '').replace('.BO', ''),
+                    "score": item['score']
+                })
+
+        return {"trends": clean_trends, "peers": peers}
+    except:
+        return {"trends": {}, "peers": []}
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
