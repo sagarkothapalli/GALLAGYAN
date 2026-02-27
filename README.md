@@ -8,23 +8,25 @@
 
 ## 🌟 Features Completed (MVP Speedrun)
 
-### 1. 📈 Real-Time Market Data
-- **Universal Search:** Search 5,000+ Indian stocks in real-time using `yahooquery` global search.
-- **Advanced Stats:** Correctly displays P/E Ratio, Market Cap (Cr), 52-Week High/Low.
-- **Progressive Loading:** Prices load instantly, while history and news stream in the background.
+### 1. 📈 Professional Market Data
+- **Universal Search:** Search 5,000+ Indian stocks in real-time using `yahooquery`.
+- **Market Pulse:** Live Nifty 50 and Sensex tracking with "Market Open" status.
+- **Volume Spike Alert:** Real-time detection of unusual trading activity (>10M volume).
 
-### 2. 🕯️ Professional Visualization
-- **Lite Theme:** Modern, clean light-mode UI for better readability.
-- **Interactive Charts:** High-performance `lightweight-charts` with adaptive styling.
+### 2. 🕯️ Advanced Technical Analysis
+- **Multi-Timeframe Charts:** Switch between 1D, 1M, 1Y, and 5Y views.
+- **Indicators:** Integrated SMA (20, 50), EMA (9, 21), and RSI (14) for deep trend analysis.
+- **Sentiment Engine:** Keyword-based news analysis (Bullish/Bearish) and Analyst Recommendation bars.
 
-### 3. 🛡️ Security & Reliability
-- **Rate Limiting:** Backend protection against abuse (via `slowapi`).
-- **CORS & CSP:** Hardened headers for secure data transmission.
-- **SSL Badge:** Visual trust confirmation for users.
+### 3. 💼 Portfolio & Fundamentals
+- **P&L Tracker:** Real-time calculation of total portfolio value and returns.
+- **Deep Fundamentals:** Quarterly Revenue, Net Income, and EPS growth tables.
+- **Corporate Actions:** Tracking Dividend history and Valuation metrics (P/B, Beta).
 
-### 4. ⚡ GallaGyan Lite & SEO
-- **Optimized Performance:** Drastically reduced loading times via backend caching.
-- **Contact:** Reach us at [contact@gallagyan.xyz](mailto:contact@gallagyan.xyz).
+### 4. ⚡ Elite Performance & Security
+- **Lite Theme:** Modern, ultra-fast light-mode UI.
+- **Rate Limiting:** Protection against API abuse via `slowapi`.
+- **Progressive Loading:** Instant price feedback with background data streaming.
 
 ---
 
