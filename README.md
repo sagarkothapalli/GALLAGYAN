@@ -76,7 +76,7 @@ npm run dev
 ## 🛠️ Support & Contact
 For support, feedback, or collaborations:
 - **GitHub:** [kothapallianandsagar](https://github.com/kothapallianandsagar)
-- **Email:** [kothapallianandsagar@gmail.com](mailto:kothapallianandsagar@gmail.com)
+- **Email:** [contact@gallagyan.xyz](mailto:contact@gallagyan.xyz)
 
 ---
 

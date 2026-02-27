@@ -418,6 +418,7 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-10 font-bold uppercase tracking-[0.2em] text-[10px] text-slate-400">
             <span className="hover:text-slate-900 cursor-pointer transition-colors">Real-time Data</span>
             <span className="hover:text-slate-900 cursor-pointer transition-colors">Analysis Engine</span>
+            <a href="mailto:contact@gallagyan.xyz" className="hover:text-blue-600 transition-colors">Contact Support</a>
             <a href="/privacy" className="hover:text-slate-900 cursor-pointer transition-colors">Privacy</a>
           </div>
         </div>
