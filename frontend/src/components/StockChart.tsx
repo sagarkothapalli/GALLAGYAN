@@ -25,30 +25,23 @@ export const StockChart = ({ data }: { data: ChartData[] }) => {
     const isMobile = window.innerWidth < 768;
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#111827' },
-        textColor: '#D1D5DB',
+        background: { type: ColorType.Solid, color: '#ffffff' },
+        textColor: '#64748b',
       },
       grid: {
-        vertLines: { color: '#374151' },
-        horzLines: { color: '#374151' },
+        vertLines: { color: '#f1f5f9' },
+        horzLines: { color: '#f1f5f9' },
       },
       width: chartContainerRef.current.clientWidth,
       height: isMobile ? 300 : 400,
-      handleScale: {
-        // @ts-ignore - Ignore type error as this property might be from an older version
-        touchAttributes: {
-          disableScroll: true,
-        }
-      }
     });
 
-    // Use addSeries with CandlestickSeries to avoid the "not a function" error
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10B981',
-      downColor: '#EF4444',
+      upColor: '#10b981',
+      downColor: '#f43f5e',
       borderVisible: false,
-      wickUpColor: '#10B981',
-      wickDownColor: '#EF4444',
+      wickUpColor: '#10b981',
+      wickDownColor: '#f43f5e',
     });
 
     candlestickSeries.setData(data);
