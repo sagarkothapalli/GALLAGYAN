@@ -104,6 +104,23 @@ async def get_stock_news(request: Request, ticker: str):
 async def get_market_news(request: Request):
     return await get_stock_news(request, "Indian stock market")
 
+@app.get("/api/market/indices")
+@limiter.limit("30/minute")
+async def get_indices(request: Request):
+    indices = ["^NSEI", "^BSESN"]
+    results = []
+    for idx in indices:
+        t = Ticker(idx)
+        p = t.price.get(idx, {})
+        if p:
+            results.append({
+                "symbol": "NIFTY 50" if idx == "^NSEI" else "SENSEX",
+                "price": p.get("regularMarketPrice"),
+                "change": round(p.get("regularMarketChange", 0), 2),
+                "percent_change": round(p.get("regularMarketChangePercent", 0) * 100, 2)
+            })
+    return results
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
@@ -111,30 +128,29 @@ async def get_suggestions(request: Request, query: str = ""):
         return []
         
     try:
-        # Real-time search using yahooquery
         search_results = search(query)
         results = []
+        seen_symbols = set()
         
         if 'quotes' in search_results:
             for quote in search_results['quotes']:
                 symbol = quote.get('symbol', '')
-                # Specifically target Indian stocks
+                clean_symbol = symbol.replace('.NS', '').replace('.BO', '')
+                
+                if clean_symbol in seen_symbols:
+                    continue
+                
                 if symbol.endswith('.NS') or symbol.endswith('.BO'):
                     results.append({
-                        "symbol": symbol.replace('.NS', '').replace('.BO', ''),
-                        "name": quote.get('longname') or quote.get('shortname') or symbol
+                        "symbol": clean_symbol,
+                        "name": quote.get('longname') or quote.get('shortname') or symbol,
+                        "exchange": "NSE" if symbol.endswith('.NS') else "BSE"
                     })
+                    seen_symbols.add(clean_symbol)
         
-        # Fallback to general matches if no Indian stocks
-        if not results and 'quotes' in search_results:
-             for quote in search_results['quotes'][:5]:
-                results.append({
-                    "symbol": quote.get('symbol', ''),
-                    "name": quote.get('longname') or quote.get('shortname') or quote.get('symbol')
-                })
-
         return results[:10]
-    except:
+    except Exception as e:
+        print(f"Search error: {e}")
         return []
 
 if __name__ == "__main__":

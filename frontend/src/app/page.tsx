@@ -45,6 +45,7 @@ interface NewsItem {
 interface Suggestion {
   symbol: string;
   name: string;
+  exchange?: string;
 }
 
 interface PortfolioItem {
@@ -72,6 +73,7 @@ export default function Home() {
   const [history, setHistory] = useState<ChartData[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [marketNews, setMarketNews] = useState<NewsItem[]>([]);
+  const [marketIndices, setMarketIndices] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [isBackendLive, setIsBackendLive] = useState(true);
@@ -82,6 +84,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'chart' | 'financials' | 'news' | 'portfolio'>('chart');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [portfolioInput, setPortfolioInput] = useState({ buyPrice: '', quantity: '' });
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,6 +95,7 @@ export default function Home() {
     if (savedPortfolio) { try { setPortfolio(JSON.parse(savedPortfolio)); } catch (e) {} }
     
     checkHealth();
+    fetchIndices();
     fetchMarketNews();
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -128,6 +132,7 @@ export default function Home() {
             fetchMarketNews();
         }
         checkHealth();
+        fetchIndices();
     }, 30000);
     return () => clearInterval(interval);
   }, [stock, isMounted]);
@@ -140,6 +145,14 @@ export default function Home() {
     } catch (e) {
       setIsBackendLive(false);
     }
+  };
+
+  const fetchIndices = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${baseUrl}/api/market/indices`);
+      if (res.ok) setMarketIndices(await res.json());
+    } catch (e) {}
   };
 
   const refreshCurrentStock = async (symbol: string) => {
@@ -238,13 +251,26 @@ export default function Home() {
     setPortfolio(prev => prev.filter(i => i.symbol !== symbol));
   };
 
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-
   if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 font-sans selection:bg-blue-100 overflow-x-hidden">
       
+      {/* Indices Bar */}
+      <div className="bg-white border-b border-slate-200/60 overflow-x-auto no-scrollbar">
+        <div className="max-w-7xl mx-auto px-4 flex items-center gap-8 py-2.5">
+          {marketIndices.map(idx => (
+            <div key={idx.symbol} className="flex items-center gap-3 whitespace-nowrap">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{idx.symbol}</span>
+              <span className="text-xs font-bold text-slate-900">₹{idx.price?.toLocaleString('en-IN')}</span>
+              <span className={`text-[10px] font-bold ${idx.change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {idx.change >= 0 ? '+' : ''}{idx.percent_change?.toFixed(2)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {!isBackendLive && (
         <div className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-[0.3em] py-2 text-center animate-pulse sticky top-0 z-[60]">
           System Offline: Connecting to GallaGyan Treasury...
@@ -252,7 +278,7 @@ export default function Home() {
       )}
 
       {/* Dynamic Progress Bar for Background Loading */}
-      {bgLoading && <div className="fixed top-0 left-0 h-1 bg-blue-600 z-[100] animate-progress-fast shadow-[0_0_10px_rgba(37,99,235,0.5)]" />}
+      {bgLoading && <div className="fixed top-[41px] left-0 h-1 bg-blue-600 z-[100] animate-progress-fast shadow-[0_0_10px_rgba(37,99,235,0.5)]" />}
 
       <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-slate-200/60 px-4 py-3">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-6 items-center">
@@ -293,7 +319,10 @@ export default function Home() {
                     className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 border-b border-slate-50 last:border-0 text-left transition-colors group"
                   >
                     <div>
-                      <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{s.symbol}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{s.symbol}</p>
+                        {s.exchange && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors uppercase">{s.exchange}</span>}
+                      </div>
                       <p className="text-[11px] font-medium text-slate-400">{s.name}</p>
                     </div>
                     <div className="text-[10px] font-bold text-slate-300 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">View Details →</div>
