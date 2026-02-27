@@ -55,6 +55,14 @@ interface PortfolioItem {
   quantity: number;
 }
 
+interface FundamentalData {
+  date: string;
+  revenue: number;
+  net_income: number;
+  ebitda: number;
+  eps: number;
+}
+
 const QUICK_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ETERNAL'];
 const PERIODS = [
     { label: '1D', value: '1d', interval: '1m' },
@@ -80,6 +88,7 @@ export default function Home() {
   const [stock, setStock] = useState<StockData | null>(null);
   const [history, setHistory] = useState<ChartData[]>([]);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [fundamentals, setFundamentals] = useState<FundamentalData[]>([]);
   const [marketNews, setMarketNews] = useState<NewsItem[]>([]);
   const [marketIndices, setMarketIndices] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -210,6 +219,7 @@ export default function Home() {
     setActiveTab('chart');
     setHistory([]);
     setNews([]);
+    setFundamentals([]);
     try {
       const rawInput = symbol.trim().toUpperCase();
       let cleanSymbol = rawInput.replace(/\s+/g, '');
@@ -219,8 +229,14 @@ export default function Home() {
       const stockData = await stockRes.json();
       setStock(stockData);
       setLoading(false);
-      const newsRes = await fetch(`${baseUrl}/api/stock/${cleanSymbol}/news`);
+      
+      // Parallel fetch for secondary data
+      const [newsRes, fundRes] = await Promise.all([
+        fetch(`${baseUrl}/api/stock/${cleanSymbol}/news`),
+        fetch(`${baseUrl}/api/stock/${cleanSymbol}/fundamentals`)
+      ]);
       if (newsRes.ok) setNews(await newsRes.json());
+      if (fundRes.ok) setFundamentals(await fundRes.json());
     } catch (err: any) {
       setError(err.message);
       setStock(null);
@@ -267,8 +283,13 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 font-sans selection:bg-blue-100 overflow-x-hidden">
       
+      {/* Indices Bar */}
       <div className="bg-white border-b border-slate-200/60 overflow-x-auto no-scrollbar">
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-8 py-2.5">
+          <div className="flex items-center gap-2 pr-4 border-r border-slate-100">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Market Open</span>
+          </div>
           {marketIndices.map(idx => (
             <div key={idx.symbol} className="flex items-center gap-3 whitespace-nowrap">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{idx.symbol}</span>
@@ -371,8 +392,37 @@ export default function Home() {
                     </div>
                   )}
                   {activeTab === 'financials' && (
-                    <div className="bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200/60 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12">
-                        <Stat label="Open Price" value={stock.open} isCurrency /><Stat label="Market Cap" value={`₹${(stock.market_cap / 10000000).toFixed(0)} Cr`} /><Stat label="P/E Ratio" value={stock.pe_ratio?.toFixed(2) ?? '-'} /><Stat label="Volume" value={stock.volume.toLocaleString()} /><Stat label="52W High" value={stock.fiftyTwoWeekHigh} isCurrency /><Stat label="52W Low" value={stock.fiftyTwoWeekLow} isCurrency /><Stat label="Avg Volume" value="-" /><Stat label="Div. Yield" value={`${(stock.dividendYield * 100).toFixed(2)}%`} />
+                    <div className="space-y-8">
+                        <div className="bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200/60 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12">
+                            <Stat label="Open Price" value={stock.open} isCurrency /><Stat label="Market Cap" value={`₹${(stock.market_cap / 10000000).toFixed(0)} Cr`} /><Stat label="P/E Ratio" value={stock.pe_ratio?.toFixed(2) ?? '-'} /><Stat label="Volume" value={stock.volume.toLocaleString()} /><Stat label="52W High" value={stock.fiftyTwoWeekHigh} isCurrency /><Stat label="52W Low" value={stock.fiftyTwoWeekLow} isCurrency /><Stat label="Avg Volume" value="-" /><Stat label="Div. Yield" value={`${(stock.dividendYield * 100).toFixed(2)}%`} />
+                        </div>
+                        {fundamentals.length > 0 && (
+                            <div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
+                                <h3 className="text-lg font-bold text-slate-900 mb-6">Quarterly Fundamentals</h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                                <th className="pb-4">Quarter</th>
+                                                <th className="pb-4 text-right">Revenue (Cr)</th>
+                                                <th className="pb-4 text-right">Net Income (Cr)</th>
+                                                <th className="pb-4 text-right">EPS (₹)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {fundamentals.map((f, i) => (
+                                                <tr key={i} className="text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors group">
+                                                    <td className="py-4 font-bold text-slate-900">{f.date}</td>
+                                                    <td className="py-4 text-right">₹{(f.revenue / 10000000).toLocaleString('en-IN')}</td>
+                                                    <td className="py-4 text-right text-emerald-600 font-bold">₹{(f.net_income / 10000000).toLocaleString('en-IN')}</td>
+                                                    <td className="py-4 text-right font-mono text-xs">{f.eps?.toFixed(2) || '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
                   )}
                   {activeTab === 'news' && (
@@ -456,7 +506,7 @@ function NewsCard({ item }: { item: NewsItem }) {
 function Stat({ label, value, isCurrency = false }: { label: string, value: any, isCurrency?: boolean }) {
   return (
     <div className="space-y-1.5 group">
-      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest truncate">{label}</p>
+      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest truncate group-hover:text-slate-500 transition-colors">{label}</p>
       <p className="font-mono text-xl font-bold text-slate-900 tracking-tighter group-hover:scale-105 origin-left transition-transform">{isCurrency && typeof value === 'number' ? `₹${value.toLocaleString('en-IN')}` : (value ?? '-')}</p>
     </div>
   );

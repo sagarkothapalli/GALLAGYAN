@@ -191,6 +191,40 @@ async def get_stock_news(request: Request, ticker: str):
 async def get_market_news(request: Request):
     return await get_stock_news(request, "Indian stock market")
 
+@app.get("/api/stock/{ticker}/fundamentals")
+@limiter.limit("20/minute")
+async def get_fundamentals(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        # Fetch last 4 quarters of income statement
+        is_stmt = t.income_statement(frequency="q")
+        if is_stmt is None or (hasattr(is_stmt, 'empty') and is_stmt.empty):
+            if "." not in ticker:
+                sym = f"{ticker}.BO"
+                t = Ticker(sym)
+                is_stmt = t.income_statement(frequency="q")
+        
+        if is_stmt is None or (hasattr(is_stmt, 'empty') and is_stmt.empty):
+            return []
+
+        # Convert to a clean list of records
+        df = is_stmt.reset_index()
+        fundamentals = []
+        for _, row in df.tail(4).iterrows():
+            date_val = row['asOfDate']
+            fundamentals.append({
+                "date": date_val.strftime('%b %Y') if hasattr(date_val, 'strftime') else str(date_val),
+                "revenue": row.get('TotalRevenue'),
+                "net_income": row.get('NetIncome'),
+                "ebitda": row.get('EBITDA'),
+                "eps": row.get('BasicEPS')
+            })
+        return fundamentals
+    except:
+        return []
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
