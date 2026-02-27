@@ -211,6 +211,22 @@ async def get_calendar(request: Request, ticker: str):
     except:
         return {}
 
+@app.get("/api/stock/{ticker}/holders")
+@limiter.limit("20/minute")
+async def get_holders(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        holders = t.major_holders.get(sym, {})
+        return {
+            "insiders": holders.get('insidersPercentHeld', 0),
+            "institutions": holders.get('institutionsPercentHeld', 0),
+            "institutions_count": holders.get('institutionsCount', 0)
+        }
+    except:
+        return {}
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
