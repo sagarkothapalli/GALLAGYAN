@@ -14,6 +14,7 @@ interface ChartData {
 
 interface StockChartProps {
   data: ChartData[];
+  comparisonData?: { symbol: string, points: ChartData[] } | null;
   showSMA20?: boolean;
   showSMA50?: boolean;
   showEMA9?: boolean;
@@ -66,7 +67,7 @@ const calculateRSI = (data: ChartData[], period: number = 14) => {
     return rsi;
 };
 
-export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false, showVolume = true, isDark = false }: StockChartProps) => {
+export const StockChart = ({ data, comparisonData, showSMA20 = false, showSMA50 = false, showEMA9 = false, showEMA21 = false, showRSI = false, showVolume = true, isDark = false }: StockChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -115,17 +116,30 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
         s.setData(calculateEMA(data, 21));
     }
 
+    // Comparison Series
+    if (comparisonData && comparisonData.points.length > 0) {
+        const compSeries = chart.addSeries(LineSeries, {
+            color: '#6366f1',
+            lineWidth: 2,
+            title: comparisonData.symbol,
+            priceScaleId: 'comparison',
+        });
+        
+        chart.priceScale('comparison').applyOptions({
+            position: 'left',
+            scaleMargins: { top: 0.1, bottom: 0.1 },
+        });
+
+        compSeries.setData(comparisonData.points.map(p => ({ time: p.time, value: p.close })));
+    }
+
     if (showVolume) {
         const volumeSeries = chart.addSeries(HistogramSeries, {
             color: '#26a69a',
             priceFormat: { type: 'volume' },
             priceScaleId: 'volume',
         });
-        
-        chart.priceScale('volume').applyOptions({
-            scaleMargins: { top: 0.8, bottom: 0 },
-        });
-
+        chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
         volumeSeries.setData(data.map(d => ({
             time: d.time,
             value: d.volume || 0,
@@ -147,7 +161,7 @@ export const StockChart = ({ data, showSMA20 = false, showSMA50 = false, showEMA
     chartRef.current = chart;
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
-  }, [data, showSMA20, showSMA50, showEMA9, showEMA21, showRSI, showVolume, isDark]);
+  }, [data, comparisonData, showSMA20, showSMA50, showEMA9, showEMA21, showRSI, showVolume, isDark]);
 
   return <div className="w-full mt-6"><div ref={chartContainerRef} className="w-full" /></div>;
 };
