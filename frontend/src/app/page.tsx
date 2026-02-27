@@ -64,6 +64,13 @@ interface FundamentalData {
 }
 
 const QUICK_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ETERNAL'];
+const SECTORS = [
+    { name: 'Nifty Bank', symbol: '^NSEBANK' },
+    { name: 'Nifty IT', symbol: '^CNXIT' },
+    { name: 'Nifty Auto', symbol: '^CNXAUTO' },
+    { name: 'Nifty FMCG', symbol: '^CNXFMCG' },
+    { name: 'Nifty Metal', symbol: '^CNXMETAL' }
+];
 const PERIODS = [
     { label: '1D', value: '1d', interval: '1m' },
     { label: '5D', value: '5d', interval: '5m' },
@@ -92,6 +99,7 @@ export default function Home() {
   const [actions, setActions] = useState<any>(null);
   const [marketNews, setMarketNews] = useState<NewsItem[]>([]);
   const [marketIndices, setMarketIndices] = useState<any[]>([]);
+  const [sectorData, setSectorPerformance] = useState<any[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [isBackendLive, setIsBackendLive] = useState(true);
@@ -106,6 +114,8 @@ export default function Home() {
   const [chartPeriod, setChartPeriod] = useState(PERIODS[2]);
   const [showSMA20, setShowSMA20] = useState(false);
   const [showSMA50, setShowSMA50] = useState(false);
+  const [showEMA9, setShowEMA9] = useState(false);
+  const [showEMA21, setShowEMA21] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,6 +127,7 @@ export default function Home() {
     checkHealth();
     fetchIndices();
     fetchMarketNews();
+    fetchSectorPerformance();
     const handleClickOutside = (e: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSuggestions(false); };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -139,8 +150,34 @@ export default function Home() {
 
   const checkHealth = async () => { try { const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/health`); setIsBackendLive(res.ok); } catch (e) { setIsBackendLive(false); } };
   const fetchIndices = async () => { try { const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/market/indices`); if (res.ok) setMarketIndices(await res.json()); } catch (e) {} };
-  const fetchHistory = async (symbol: string, period: typeof PERIODS[0]) => { setBgLoading(true); try { const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${symbol}/history?period=${period.value}&interval=${period.interval}`); if (res.ok) setHistory(await res.json()); } catch (e) {} setBgLoading(false); };
-  const refreshCurrentStock = async (symbol: string) => { try { const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const [stockRes, newsRes] = await Promise.all([fetch(`${baseUrl}/api/stock/${symbol}`), fetch(`${baseUrl}/api/stock/${symbol}/news`)]); if (stockRes.ok) setStock(await stockRes.json()); if (newsRes.ok) setNews(await newsRes.json()); } catch (e) {} };
+  const fetchSectorPerformance = async () => {
+    try {
+        const res = await Promise.all(SECTORS.map(async s => {
+            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${s.symbol.replace('^', '')}`);
+            return r.ok ? { ...await r.json(), name: s.name } : null;
+        }));
+        setSectorPerformance(res.filter(Boolean));
+    } catch (e) {}
+  };
+
+  const fetchHistory = async (symbol: string, period: typeof PERIODS[0]) => {
+    setBgLoading(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${baseUrl}/api/stock/${symbol}/history?period=${period.value}&interval=${period.interval}`);
+      if (res.ok) setHistory(await res.json());
+    } catch (e) {}
+    setBgLoading(false);
+  };
+
+  const refreshCurrentStock = async (symbol: string) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const [stockRes, newsRes] = await Promise.all([fetch(`${baseUrl}/api/stock/${symbol}`), fetch(`${baseUrl}/api/stock/${symbol}/news`)]);
+      if (stockRes.ok) setStock(await stockRes.json());
+      if (newsRes.ok) setNews(await newsRes.json());
+    } catch (e) {}
+  };
 
   useEffect(() => {
     const fetchSuggestions = async () => { if (ticker.length < 2) { setSuggestions([]); return; } try { const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/search/suggestions?query=${ticker}`); if (res.ok) setSuggestions(await res.json()); } catch (e) {} };
@@ -199,7 +236,7 @@ export default function Home() {
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4"><div className="flex p-1.5 bg-white border border-slate-200/60 rounded-2xl w-full md:w-max shadow-sm overflow-hidden">{(['chart', 'financials', 'news', 'portfolio'] as const).map((tab) => (<button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 md:w-32 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}>{tab}</button>))}</div>{activeTab === 'chart' && (<div className="flex p-1 bg-slate-100 rounded-xl overflow-hidden shadow-inner">{PERIODS.map(p => (<button key={p.label} onClick={() => setChartPeriod(p)} className={`px-4 py-1.5 text-[10px] font-black transition-all ${chartPeriod.label === p.label ? 'bg-white text-blue-600 shadow-sm rounded-lg' : 'text-slate-400 hover:text-slate-600'}`}>{p.label}</button>))}</div>)}</div>
                 <div className="animate-in fade-in duration-500">
-                  {activeTab === 'chart' && (<div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-200/60 shadow-sm relative min-h-[400px]"><div className="flex flex-wrap gap-2 mb-4"><button onClick={() => setShowSMA20(!showSMA20)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showSMA20 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 20</button><button onClick={() => setShowSMA50(!showSMA50)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showSMA50 ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 50</button></div><StockChart data={history} showSMA20={showSMA20} showSMA50={showSMA50} /></div>)}
+                  {activeTab === 'chart' && (<div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-200/60 shadow-sm relative min-h-[400px]"><div className="flex flex-wrap gap-2 mb-4"><button onClick={() => setShowSMA20(!showSMA20)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showSMA20 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 20</button><button onClick={() => setShowSMA50(!showSMA50)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showSMA50 ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 50</button><button onClick={() => setShowEMA9(!showEMA9)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showEMA9 ? 'bg-pink-50 border-pink-200 text-pink-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>EMA 9</button><button onClick={() => setShowEMA21(!showEMA21)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${showEMA21 ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>EMA 21</button></div><StockChart data={history} showSMA20={showSMA20} showSMA50={showSMA50} showEMA9={showEMA9} showEMA21={showEMA21} /></div>)}
                   {activeTab === 'financials' && (<div className="space-y-8 animate-in fade-in"><div className="bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200/60 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12"><Stat label="Open Price" value={stock.open} isCurrency /><Stat label="Market Cap" value={`₹${(stock.market_cap / 10000000).toFixed(0)} Cr`} /><Stat label="P/E Ratio" value={stock.pe_ratio?.toFixed(2) ?? '-'} /><Stat label="Volume" value={stock.volume.toLocaleString()} /><Stat label="52W High" value={stock.fiftyTwoWeekHigh} isCurrency /><Stat label="52W Low" value={stock.fiftyTwoWeekLow} isCurrency /><Stat label="Beta" value={actions?.beta?.toFixed(2) || '-'} /><Stat label="Div. Yield" value={`${(stock.dividendYield * 100).toFixed(2)}%`} /></div>
                     {actions && (<div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm"><h3 className="text-lg font-bold text-slate-900 mb-6">Valuation Metrics</h3><div className="space-y-4"><div className="flex justify-between py-2 border-b border-slate-50 text-xs font-bold uppercase text-slate-400"><span>P/B Ratio</span><span className="text-slate-900">{actions.price_to_book?.toFixed(2) || '-'}</span></div><div className="flex justify-between py-2 border-b border-slate-50 text-xs font-bold uppercase text-slate-400"><span>Insider Holdings</span><span className="text-slate-900">{(actions.held_by_insiders * 100)?.toFixed(2)}%</span></div><div className="flex justify-between py-2 border-b border-slate-50 text-xs font-bold uppercase text-slate-400"><span>EPS (Trailing)</span><span className="text-slate-900">₹{actions.trailing_eps?.toFixed(2) || '-'}</span></div></div></div><div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm"><h3 className="text-lg font-bold text-slate-900 mb-6">Dividend History</h3>{actions.dividends?.length > 0 ? (<div className="space-y-4">{actions.dividends.map((d: any, i: number) => (<div key={i} className="flex justify-between py-2 border-b border-slate-50"><span className="text-xs text-slate-400 font-bold uppercase">{new Date(d.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}</span><span className="text-sm font-bold text-emerald-600">₹{d.amount}</span></div>))}</div>) : (<p className="text-center py-10 text-slate-300 text-xs font-bold uppercase tracking-widest">No recent dividends</p>)}</div></div>)}
                     {fundamentals.length > 0 && (<div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm overflow-hidden"><h3 className="text-lg font-bold text-slate-900 mb-6">Quarterly Fundamentals</h3><div className="overflow-x-auto"><table className="w-full text-left"><thead><tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100"><th className="pb-4">Quarter</th><th className="pb-4 text-right">Revenue (Cr)</th><th className="pb-4 text-right">Net Income (Cr)</th><th className="pb-4 text-right">EPS (₹)</th></tr></thead><tbody className="divide-y divide-slate-50">{fundamentals.map((f, i) => (<tr key={i} className="text-sm font-medium text-slate-700 hover:bg-slate-50"><td className="py-4 font-bold text-slate-900">{f.date}</td><td className="py-4 text-right">₹{(f.revenue / 10000000).toLocaleString('en-IN')}</td><td className="py-4 text-right text-emerald-600 font-bold">₹{(f.net_income / 10000000).toLocaleString('en-IN')}</td><td className="py-4 text-right font-mono text-xs">{f.eps?.toFixed(2) || '-'}</td></tr>))}</tbody></table></div></div>)}
@@ -210,7 +247,11 @@ export default function Home() {
               </div>
             </div>
           ) : !loading && (
-            <div className="space-y-12 animate-in fade-in duration-1000"><div className="flex flex-col items-center justify-center py-24 bg-white border border-slate-200/60 rounded-[3rem] text-center shadow-sm relative overflow-hidden"><div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.03),transparent)]" /><div className="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center mb-8 text-4xl font-black shadow-2xl shadow-blue-500/20 rotate-6 text-white relative z-10">G</div><h3 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight relative z-10">Financial Treasury</h3><p className="text-slate-400 mt-4 max-w-sm mx-auto font-medium relative z-10">Professional-grade analysis for the Indian markets. Start by searching any NSE/BSE ticker above.</p></div><div className="space-y-6"><div className="flex items-center justify-between px-2"><h3 className="text-xl font-bold text-slate-900">Market Pulse</h3><span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">LIVE FEED</span></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{marketNews.map((item, idx) => (<NewsCard key={idx} item={item} />))}</div></div></div>
+            <div className="space-y-12 animate-in fade-in duration-1000">
+              <div className="flex flex-col items-center justify-center py-24 bg-white border border-slate-200/60 rounded-[3rem] text-center shadow-sm relative overflow-hidden"><div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.03),transparent)]" /><div className="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center mb-8 text-4xl font-black shadow-2xl shadow-blue-500/20 rotate-6 text-white relative z-10">G</div><h3 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight relative z-10">Financial Treasury</h3><p className="text-slate-400 mt-4 max-w-sm mx-auto font-medium relative z-10">Professional-grade analysis for the Indian markets. Start by searching any NSE/BSE ticker above.</p></div>
+              <div className="space-y-8"><div className="flex items-center justify-between px-2"><h3 className="text-xl font-bold text-slate-900">Sector Performance</h3><span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">TOP INDICES</span></div><div className="grid grid-cols-2 md:grid-cols-5 gap-4">{sectorData.map(s => (<button key={s.symbol} onClick={() => fetchStock(s.symbol)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm text-left hover:border-blue-200 transition-all group"><p className="text-[10px] font-black text-slate-400 uppercase mb-1">{s.name}</p><p className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">₹{s.price.toLocaleString('en-IN')}</p><p className={`text-[10px] font-bold ${s.percent_change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{s.percent_change >= 0 ? '+' : ''}{s.percent_change.toFixed(2)}%</p></button>))}</div></div>
+              <div className="space-y-6"><div className="flex items-center justify-between px-2"><h3 className="text-xl font-bold text-slate-900">Market Pulse</h3><span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">LIVE FEED</span></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{marketNews.map((item, idx) => (<NewsCard key={idx} item={item} />))}</div></div>
+            </div>
           )}
         </div>
         <div className="lg:col-span-4 space-y-8"><section className="bg-white rounded-[2.5rem] p-8 border border-slate-200/60 shadow-sm"><h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-6">Pinned Indices</h3><div className="space-y-3">{QUICK_STOCKS.map(s => (<button key={s} onClick={() => { setTicker(s); fetchStock(s); }} className="w-full bg-slate-50 hover:bg-slate-100 px-5 py-4 rounded-2xl text-sm font-bold transition-all text-left border border-slate-100 flex justify-between items-center group"><span className="group-hover:text-blue-600 transition-colors text-slate-800">{s}</span><svg className="w-4 h-4 text-slate-300 group-hover:text-blue-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"/></svg></button>))}</div></section><section className="bg-white rounded-[2.5rem] p-8 border border-slate-200/60 shadow-sm min-h-[300px] relative overflow-hidden"><h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-6">Your Vault</h3>{watchlist.length === 0 ? (<div className="flex flex-col items-center justify-center py-20 text-center space-y-4"><p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Vault is Empty</p></div>) : (<div className="space-y-3">{watchlist.map(s => (<div key={s} className="flex justify-between items-center bg-blue-50/50 hover:bg-blue-50 p-4 rounded-2xl border border-blue-100 transition-colors group"><button onClick={() => { setTicker(s); fetchStock(s); }} className="text-blue-600 font-bold text-sm flex-1 text-left">{s}</button><button onClick={(e) => toggleWatchlist(e, s)} className="text-slate-300 hover:text-rose-500 p-1 transform scale-0 group-hover:scale-100 transition-transform">✕</button></div>))}</div>)}</section></div>
@@ -224,7 +265,7 @@ export default function Home() {
 function NewsCard({ item }: { item: NewsItem }) {
   const isDanger = /SCAM|FRAUD|CRASH|INVESTIGATION|PENALTY|LOSS|SEBI|FALL|MISS/i.test(item.title);
   return (
-    <a href={item.link} target="_blank" rel="noopener noreferrer" className={`flex flex-col gap-4 p-6 rounded-3xl transition-all hover:scale-[1.02] shadow-sm hover:shadow-md ${isDanger ? 'bg-rose-50 border-rose-100 shadow-rose-500/5' : 'bg-white border-slate-100'} border group`}>
+    <a href={item.link} target="_blank" rel="noopener noreferrer" className={`flex flex-col gap-4 p-6 rounded-3xl transition-all hover:scale-[1.02] shadow-sm hover:shadow-md ${isDanger ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100'} border group`}>
       <div className="flex justify-between items-center"><div className="flex items-center gap-2"><span className={`text-[9px] font-bold uppercase tracking-[0.1em] px-2 py-0.5 rounded-md ${isDanger ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{item.publisher}</span></div><span className="text-[9px] font-bold text-slate-400 uppercase">{formatTime(item.providerPublishTime)}</span></div>
       <h4 className={`font-bold text-sm leading-snug line-clamp-3 ${isDanger ? 'text-rose-900' : 'text-slate-800 group-hover:text-blue-600'}`}>{item.title}</h4>
     </a>
