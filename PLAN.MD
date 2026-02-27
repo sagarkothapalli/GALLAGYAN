@@ -49,11 +49,19 @@ This document outlines the steps to deploy the GallaGyan platform using free-tie
 
 ---
 
-## 🛠️ 4. Post-Deployment Verification
+## 🔮 4. Future Roadmap
 
-- [ ] Check if `https://gallagyan.xyz` loads the frontend.
-- [ ] Search for a stock (e.g., `RELIANCE`) to verify frontend-to-backend communication.
-- [ ] Verify that charts and news are loading correctly.
+### ✅ Phase 2 (Completed)
+- [x] **Portfolio Tracker:** Real-time P&L and summary dashboard.
+- [x] **Technical Toolkit:** RSI, SMA, EMA, and Volume histograms.
+- [x] **Deep Fundamentals:** Quarterly income statements and valuation metrics.
+- [x] **Professional UX:** Dark Mode toggle and real-time Price Alerts.
+
+### 🚀 Phase 3 (Next Steps)
+- [ ] **Advanced Comparisons:** Overlay two stocks on one chart.
+- [ ] **Data Export:** Download historical prices and fundamentals as CSV.
+- [ ] **Live Events:** Corporate earnings and economic calendar for India.
+- [ ] **Supabase Sync:** Cloud storage for portfolios and watchlists.
 
 ---
 
