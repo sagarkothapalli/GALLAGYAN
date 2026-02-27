@@ -94,6 +94,8 @@ export default function Home() {
   const [portfolioInput, setPortfolioInput] = useState({ buyPrice: '', quantity: '' });
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [chartPeriod, setChartPeriod] = useState(PERIODS[2]);
+  const [showSMA20, setShowSMA20] = useState(false);
+  const [showSMA50, setShowSMA50] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -253,8 +255,6 @@ export default function Home() {
     let totalVal = 0;
     portfolio.forEach(item => {
         totalInv += item.buyPrice * item.quantity;
-        // In a real app, we'd fetch current prices for all. 
-        // For now, if current search is the stock, use real price, else use buy price (conservative)
         const currentPrice = (stock && stock.symbol.includes(item.symbol)) ? stock.price : item.buyPrice;
         totalVal += currentPrice * item.quantity;
     });
@@ -267,7 +267,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#fcfcfd] text-slate-900 font-sans selection:bg-blue-100 overflow-x-hidden">
       
-      {/* Indices Bar */}
       <div className="bg-white border-b border-slate-200/60 overflow-x-auto no-scrollbar">
         <div className="max-w-7xl mx-auto px-4 flex items-center gap-8 py-2.5">
           {marketIndices.map(idx => (
@@ -334,7 +333,7 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-4">
                       <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">{stock.name}</h2>
-                      <button onClick={(e) => toggleWatchlist(e, stock.symbol)} className={`transition-all hover:scale-110 p-2.5 rounded-2xl ${watchlist.includes(stock.symbol.replace('.NS', '').replace('.BO', '')) ? 'bg-yellow-50 text-yellow-500' : 'bg-slate-50 text-slate-300'}`}><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
+                      <button onClick={(e) => toggleWatchlist(e, stock.symbol)} className={`transition-all hover:scale-110 p-2.5 rounded-2xl ${watchlist.includes(stock.symbol.replace('.NS', '').replace('.BO', '')) ? 'bg-yellow-50 text-yellow-500' : 'bg-slate-100 text-slate-300'}`}><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
                     </div>
                     <div className="flex items-center gap-3"><span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest border border-slate-200/50">NSE India</span><span className="text-slate-400 font-mono font-medium text-sm">{stock.symbol}</span></div>
                   </div>
@@ -362,7 +361,15 @@ export default function Home() {
                 </div>
 
                 <div className="animate-in fade-in duration-500">
-                  {activeTab === 'chart' && <div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-200/60 shadow-sm relative min-h-[400px]"><StockChart data={history} /></div>}
+                  {activeTab === 'chart' && (
+                    <div className="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-200/60 shadow-sm relative min-h-[400px]">
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            <button onClick={() => setShowSMA20(!showSMA20)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all border ${showSMA20 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 20</button>
+                            <button onClick={() => setShowSMA50(!showSMA50)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all border ${showSMA50 ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>SMA 50</button>
+                        </div>
+                        <StockChart data={history} showSMA20={showSMA20} showSMA50={showSMA50} />
+                    </div>
+                  )}
                   {activeTab === 'financials' && (
                     <div className="bg-white rounded-[2rem] p-8 md:p-12 border border-slate-200/60 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-12">
                         <Stat label="Open Price" value={stock.open} isCurrency /><Stat label="Market Cap" value={`₹${(stock.market_cap / 10000000).toFixed(0)} Cr`} /><Stat label="P/E Ratio" value={stock.pe_ratio?.toFixed(2) ?? '-'} /><Stat label="Volume" value={stock.volume.toLocaleString()} /><Stat label="52W High" value={stock.fiftyTwoWeekHigh} isCurrency /><Stat label="52W Low" value={stock.fiftyTwoWeekLow} isCurrency /><Stat label="Avg Volume" value="-" /><Stat label="Div. Yield" value={`${(stock.dividendYield * 100).toFixed(2)}%`} />
