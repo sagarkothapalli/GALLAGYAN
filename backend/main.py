@@ -225,6 +225,40 @@ async def get_fundamentals(request: Request, ticker: str):
     except:
         return []
 
+@app.get("/api/stock/{ticker}/actions")
+@limiter.limit("20/minute")
+async def get_actions(request: Request, ticker: str):
+    ticker = ticker.upper().strip()
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = Ticker(sym)
+        stats = t.key_stats.get(sym, {})
+        
+        # Simple dividend extraction from history if direct method is restricted
+        divs = []
+        try:
+            div_data = t.dividend_history()
+            if div_data is not None and not div_data.empty:
+                div_data = div_data.reset_index()
+                for _, row in div_data.tail(5).iterrows():
+                    divs.append({
+                        "date": row['date'].strftime('%Y-%m-%d'),
+                        "amount": row['dividend']
+                    })
+        except: pass
+
+        return {
+            "price_to_book": stats.get('priceToBook'),
+            "beta": stats.get('beta'),
+            "shares_outstanding": stats.get('sharesOutstanding'),
+            "float_shares": stats.get('floatShares'),
+            "held_by_insiders": stats.get('heldPercentInsiders'),
+            "trailing_eps": stats.get('trailingEps'),
+            "dividends": divs
+        }
+    except:
+        return {}
+
 @app.get("/api/search/suggestions")
 @limiter.limit("120/minute")
 async def get_suggestions(request: Request, query: str = ""):
