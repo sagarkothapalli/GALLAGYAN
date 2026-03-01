@@ -17,7 +17,7 @@ This document outlines the steps to deploy the GallaGyan platform using free-tie
    - **Runtime:** `Python 3`
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. **Outcome:** Once deployed, copy your backend URL (e.g., `https://gallagyan-backend.onrender.com`).
+5. **Outcome:** Once deployed, copy your backend URL (e.g., `https://gallagyan.onrender.com`).
 
 ---
 
