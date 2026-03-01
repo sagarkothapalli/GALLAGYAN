@@ -29,10 +29,11 @@
 
 ---
 
-## 🛠️ Current Status (Feb 2026)
-- **Backend:** Optimized FastAPI on Render (Using `yahooquery`).
-- **Frontend:** Next.js on Vercel with Progressive Hydration.
+## 🛠️ Current Status (March 2026)
+- **Backend:** Optimized FastAPI on Render (Python 3.13, `pwdlib`, `yahooquery`).
+- **Frontend:** Next.js 16 on Vercel with TailwindCSS 4.
 - **Domain:** [https://gallagyan.xyz](https://gallagyan.xyz) (Active).
+- **Security:** Unified JWT Authentication & Bcrypt hashing.
 
 ---
 
@@ -41,15 +42,20 @@
 See the [PLAN.MD](./PLAN.MD) for full production deployment instructions on Render and Vercel.
 
 ### Prerequisites
-- Node.js 18+
-- Python 3.10+
+- Node.js 20+
+- Python 3.13+
+
+### ⚠️ Production Note (Render Free Tier)
+The backend currently uses an **ephemeral SQLite database** (`gallagyan.db`). 
+- **Persistence:** Data (portfolios/watchlists) will be **reset** whenever the Render service restarts or redeploys.
+- **Solution:** For permanent storage, connect a Render Postgres instance and update `models.py` to use `PostgresqlDatabase`.
 
 ### 1. Start the Backend
 ```bash
 cd india-finance-app/backend
 source venv/bin/activate
 pip install -r requirements.txt
-python -m uvicorn main:app --reload
+python main.py
 ```
 *Backend runs on: `http://localhost:8000`*
 
@@ -63,9 +69,11 @@ npm run dev
 
 ---
 
-## 🔮 Future Roadmap (Phase 2)
-- [ ] **Supabase Integration:** Cloud sync for Watchlist and User Accounts.
-- [ ] **Portfolio Tracker:** Add "Buy Price" and "Quantity" to track real-time P&L.
+## 🔮 Future Roadmap (Phase 2 & 3)
+- [x] **Unified Auth:** Secure login for personal data sync.
+- [x] **Portfolio Tracker:** Real-time P&L calculation.
+- [x] **Market Engine:** Hyper-optimized background refresh.
+- [ ] **Persistent Database:** Migrate from SQLite to Postgres for cloud sync.
 - [ ] **Option Chain:** Add F&O data for Nifty/BankNifty.
 - [ ] **CI/CD:** Automate deployments via GitHub Actions.
 
