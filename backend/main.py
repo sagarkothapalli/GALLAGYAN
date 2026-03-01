@@ -134,6 +134,15 @@ async def refresh_market_data():
 async def lifespan(app: FastAPI):
     """App lifespan — start background refresh task on startup."""
     logger.info("GallaGyan API starting up")
+    
+    # Initialize database and default user
+    from models import init_db
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+
     task = asyncio.create_task(refresh_market_data())
     yield
     task.cancel()
