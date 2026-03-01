@@ -129,7 +129,7 @@ export const StockChart = ({ data, comparisonData, showSMA20 = false, showSMA50 
 
     if (comparisonData && comparisonData.points.length > 0) {
         const compSeries = chart.addSeries(LineSeries, { color: '#6366f1', lineWidth: 2, title: comparisonData.symbol, priceScaleId: 'comparison' });
-        chart.priceScale('comparison').applyOptions({ position: 'left', scaleMargins: { top: 0.1, bottom: 0.1 } });
+        chart.priceScale('comparison').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
         compSeries.setData(comparisonData.points.map(p => ({ time: p.time, value: p.close })));
     }
 
@@ -141,17 +141,17 @@ export const StockChart = ({ data, comparisonData, showSMA20 = false, showSMA50 
 
     if (showRSI && data.length > 14) {
         const rsiSeries = chart.addSeries(LineSeries, { color: '#6366f1', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi' });
-        chart.priceScale('rsi').applyOptions({ position: 'right', mode: 0, autoScale: false, scaleMargins: { top: 0.1, bottom: 0.7 } });
+        chart.priceScale('rsi').applyOptions({ mode: 0, autoScale: false, scaleMargins: { top: 0.1, bottom: 0.7 } });
         rsiSeries.setData(calculateRSI(data));
     }
 
     if (showMACD && data.length > 26) {
         const { macd, signal, hist } = calculateMACD(data);
-        const macdSeries = chart.addSeries(LineSeries, { color: '#2563eb', lineWidth: 1.5, title: 'MACD', priceScaleId: 'macd' });
-        const signalSeries = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 1.5, title: 'Signal', priceScaleId: 'macd' });
+        const macdSeries = chart.addSeries(LineSeries, { color: '#2563eb', lineWidth: 2, title: 'MACD', priceScaleId: 'macd' });
+        const signalSeries = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 2, title: 'Signal', priceScaleId: 'macd' });
         const histSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'macd' });
         
-        chart.priceScale('macd').applyOptions({ position: 'right', scaleMargins: { top: 0.7, bottom: 0.1 } });
+        chart.priceScale('macd').applyOptions({ scaleMargins: { top: 0.7, bottom: 0.1 } });
         macdSeries.setData(macd);
         signalSeries.setData(signal);
         histSeries.setData(hist);

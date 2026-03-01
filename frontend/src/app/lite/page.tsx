@@ -141,12 +141,6 @@ export default function LiteHome() {
         </div>
       )}
 
-      {!stock && !loading && (
-        <div className="py-20 text-center opacity-30">
-          <p className="text-xs italic">[SEARCH TO START]</p>
-        </div>
-      )}
-
       <footer className="mt-20 pt-8 border-t border-white/10 text-[9px] text-gray-600 flex justify-between">
         <a href="/" className="hover:text-white underline">Back to Main</a>
         <span>© 2026 GALLAGYAN</span>

@@ -10,23 +10,22 @@
 
 ### 1. 📈 Professional Market Data
 - **Universal Search:** Search 5,000+ Indian stocks in real-time using `yahooquery`.
-- **Market Pulse:** Live Nifty 50 and Sensex tracking with "Market Open" status.
+- **Market Pulse:** Live Nifty 50 and Sensex tracking with Advance/Decline breadth.
 - **Volume Spike Alert:** Real-time detection of unusual trading activity (>10M volume).
 
 ### 2. 🕯️ Advanced Technical Analysis
-- **Multi-Timeframe Charts:** Switch between 1D, 1M, 1Y, and 5Y views.
-- **Indicators:** Integrated SMA (20, 50), EMA (9, 21), and RSI (14) for deep trend analysis.
-- **Sentiment Engine:** Keyword-based news analysis (Bullish/Bearish) and Analyst Recommendation bars.
+- **Comparison Tool:** Overlay multiple stocks on a single chart for relative performance.
+- **Indicators:** Integrated SMA, EMA, RSI, and MACD for professional-grade analysis.
+- **Data Export:** Instant CSV downloads for historical prices and fundamentals.
 
 ### 3. 💼 Portfolio & Fundamentals
 - **P&L Tracker:** Real-time calculation of total portfolio value and returns.
-- **Deep Fundamentals:** Quarterly Revenue, Net Income, and EPS growth tables.
-- **Corporate Actions:** Tracking Dividend history and Valuation metrics (P/B, Beta).
+- **Corporate Calendar:** Tracking upcoming Earnings dates and estimates.
+- **Ownership Pattern:** Visual breakdown of Promoter and Institutional holdings.
 
 ### 4. ⚡ Elite Performance & Security
-- **Lite Theme:** Modern, ultra-fast light-mode UI.
-- **Rate Limiting:** Protection against API abuse via `slowapi`.
-- **Progressive Loading:** Instant price feedback with background data streaming.
+- **Theme Engine:** Fully adaptive Light/Dark mode with persistent storage.
+- **Security Hardening:** Rate limiting and locked-down CORS/CSP headers.
 
 ---
 

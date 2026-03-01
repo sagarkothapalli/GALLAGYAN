@@ -8,6 +8,8 @@ pandas
 numpy
 yfinance
 python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
 lxml
 beautifulsoup4
 feedparser

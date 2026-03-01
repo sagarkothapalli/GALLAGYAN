@@ -1,0 +1,50 @@
+from peewee import *
+from passlib.context import CryptContext
+import os
+import json
+
+# Database file location
+db_path = os.path.join(os.path.dirname(__file__), "gallagyan.db")
+db = SqliteDatabase(db_path)
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class BaseModel(Model):
+    class Meta:
+        database = db
+
+
+class User(BaseModel):
+    username = CharField(unique=True)
+    passcode = CharField()  # bcrypt hashed
+    created_at = DateTimeField(constraints=[SQL('DEFAULT CURRENT_TIMESTAMP')])
+
+
+class UserData(BaseModel):
+    user = ForeignKeyField(User, backref='data', unique=True)
+    portfolio = TextField(default='[]')   # JSON string of portfolio items
+    watchlist = TextField(default='[]')   # JSON string of watchlist items
+    alerts = TextField(default='[]')      # JSON string of alert items
+
+
+def init_db():
+    db.connect()
+    db.create_tables([User, UserData])
+
+    # Default passcode read from env so it isn't hardcoded in source
+    default_passcode = os.getenv("DEFAULT_USER_PASSCODE", "changeme_on_first_run")
+    hashed = pwd_context.hash(default_passcode)
+
+    user, created = User.get_or_create(
+        username='sagar',
+        defaults={'passcode': hashed}
+    )
+    if created:
+        UserData.create(user=user)
+
+    db.close()
+
+
+if __name__ == "__main__":
+    init_db()

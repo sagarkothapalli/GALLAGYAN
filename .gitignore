@@ -1,1 +1,13 @@
 deploy_keys/
+*.db
+*.sqlite3
+.env
+.env.local
+.env.*.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+venv/
+.venv/

@@ -1,247 +1,349 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from yahooquery import Ticker, search
-import httpx
-import xml.etree.ElementTree as ET
-from datetime import datetime
-import time
+from datetime import datetime, timedelta
+import re
 import random
 from cachetools import TTLCache
 import asyncio
 from typing import List, Optional
 import os
+import logging
+import auth
+from models import db
+from dotenv import load_dotenv
 
+load_dotenv()
+
+# Structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("gallagyan")
+
+# Ticker symbol whitelist pattern
+TICKER_PATTERN = re.compile(r'^[A-Z0-9.\-&]{1,20}$')
+
+# CORS — loaded from environment, never wildcard in production
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "https://gallagyan.xyz,https://www.gallagyan.xyz,http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
+
+
+# --- HYPER-CACHE ENGINE ---
+GLOBAL_MARKET_CACHE = {
+    "indices": [],
+    "sectors": [],
+    "last_updated": None
+}
+
+# LRU Cache for on-demand stock data (1 hour TTL)
+STOCK_DETAIL_CACHE = TTLCache(maxsize=500, ttl=3600)
+HISTORY_CACHE = TTLCache(maxsize=500, ttl=3600)
+NEWS_CACHE = TTLCache(maxsize=200, ttl=1800)
+PEERS_CACHE = TTLCache(maxsize=200, ttl=7200)
+
+# High-priority stocks for background refresh
+HOT_STOCKS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+    "SBIN.NS", "BHARTIARTL.NS", "LICI.NS", "ITC.NS", "HINDUNILVR.NS"
+]
+
+INDEX_SYMBOLS = ["^NSEI", "^BSESN"]
+SECTOR_MAP = {
+    '^NSEI': 'Nifty 50', '^BSESN': 'Sensex', '^NSEBANK': 'Bank Nifty',
+    '^CNXIT': 'Nifty IT', '^CNXAUTO': 'Nifty Auto', '^CNXFMCG': 'Nifty FMCG',
+    '^CNXMETAL': 'Nifty Metal', '^CNXPHARMA': 'Nifty Pharma', '^CNXENERGY': 'Nifty Energy'
+}
+
+# Sector → representative peer stocks for the /peers endpoint
+SECTOR_PEERS = {
+    "Technology": ["TCS", "INFY", "WIPRO", "HCLTECH", "TECHM"],
+    "Financial Services": ["HDFCBANK", "ICICIBANK", "SBIN", "AXISBANK", "KOTAKBANK"],
+    "Energy": ["RELIANCE", "ONGC", "BPCL", "IOC", "NTPC"],
+    "Consumer Defensive": ["HINDUNILVR", "ITC", "DABUR", "MARICO", "GODREJCP"],
+    "Industrials": ["LT", "SIEMENS", "ABB", "BEL", "BHEL"],
+    "Communication Services": ["BHARTIARTL", "IDEA", "TTML", "MTNL"],
+    "Healthcare": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "APOLLOHOSP"],
+    "Consumer Cyclical": ["MARUTI", "TATAMOTORS", "M&M", "BAJAJ-AUTO", "EICHERMOT"],
+    "Basic Materials": ["TATASTEEL", "HINDALCO", "JSWSTEEL", "SAIL", "VEDL"],
+    "Real Estate": ["DLF", "GODREJPROP", "OBEROIRLTY", "PRESTIGE"],
+}
+
+
+async def refresh_market_data():
+    """Background engine keeping market data ready in memory."""
+    while True:
+        try:
+            all_syms = INDEX_SYMBOLS + list(SECTOR_MAP.keys()) + HOT_STOCKS
+            t = await asyncio.to_thread(Ticker, all_syms)
+            p_data = t.price
+
+            # 1. Update Indices
+            new_indices = []
+            for idx in INDEX_SYMBOLS:
+                p = p_data.get(idx, {})
+                if p:
+                    new_indices.append({
+                        "symbol": "NIFTY 50" if idx == "^NSEI" else "SENSEX",
+                        "price": p.get("regularMarketPrice"),
+                        "percent_change": round(p.get("regularMarketChangePercent", 0) * 100, 2)
+                    })
+
+            # 2. Update Sectors
+            new_sectors = []
+            for sym, name in SECTOR_MAP.items():
+                p = p_data.get(sym, {})
+                if p and p.get('regularMarketPrice'):
+                    new_sectors.append({
+                        "symbol": sym, "name": name, "price": p.get('regularMarketPrice'),
+                        "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2)
+                    })
+
+            # 3. Update Hot Stocks in Detail Cache
+            for sym in HOT_STOCKS:
+                p = p_data.get(sym, {})
+                if p and p.get('regularMarketPrice'):
+                    clean_sym = sym.replace('.NS', '')
+                    STOCK_DETAIL_CACHE[clean_sym] = {
+                        "symbol": sym, "name": p.get('longName') or clean_sym,
+                        "price": p.get('regularMarketPrice'),
+                        "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2),
+                        "change": round(p.get('regularMarketChange', 0), 2),
+                        "market_cap": p.get('marketCap')
+                    }
+
+            GLOBAL_MARKET_CACHE["indices"] = new_indices
+            GLOBAL_MARKET_CACHE["sectors"] = new_sectors
+            GLOBAL_MARKET_CACHE["last_updated"] = datetime.now().isoformat()
+            logger.info("Market cache refreshed successfully")
+
+        except Exception as e:
+            logger.error(f"Background market refresh failed: {e}")
+
+        await asyncio.sleep(45)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """App lifespan — start background refresh task on startup."""
+    logger.info("GallaGyan API starting up")
+    task = asyncio.create_task(refresh_market_data())
+    yield
+    task.cancel()
+    logger.info("GallaGyan API shut down")
+
+
+# Initialize FastAPI
+app = FastAPI(title="GallaGyan Hyper-Speed API", lifespan=lifespan)
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="GallaGyan API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-ALLOWED_ORIGINS = ["http://localhost:3000", "https://gallagyan.xyz", "https://www.gallagyan.xyz", "https://gallagyan.vercel.app"]
-env_origins = os.getenv("ALLOWED_ORIGINS")
-if env_origins: ALLOWED_ORIGINS.extend(env_origins.split(","))
+app.add_middleware(GZipMiddleware, minimum_size=250)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+    allow_credentials=True
+)
 
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["GET", "OPTIONS"], allow_headers=["*"], allow_credentials=True)
+app.include_router(auth.router)
 
-stock_cache = TTLCache(maxsize=1000, ttl=60)
-history_cache = TTLCache(maxsize=1000, ttl=3600)
-news_cache = TTLCache(maxsize=1000, ttl=600)
 
-USER_AGENTS = ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36']
-def get_random_ua(): return random.choice(USER_AGENTS)
+def validate_ticker(ticker: str) -> str:
+    """Validate and normalise a ticker symbol. Raises HTTP 400 if invalid."""
+    clean = ticker.upper().strip()
+    if not TICKER_PATTERN.match(clean):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid ticker symbol '{ticker}'. Must be 1-20 alphanumeric characters."
+        )
+    return clean
 
-def analyze_sentiment(title: str):
-    bullish = ['buy', 'growth', 'profit', 'up', 'surge', 'high', 'positive', 'gain', 'expansion', 'dividend', 'acquisition', 'bull', 'jump']
-    bearish = ['sell', 'loss', 'down', 'crash', 'scam', 'fraud', 'negative', 'fall', 'penalty', 'investigation', 'debt', 'cut', 'drop', 'miss']
-    t = title.lower(); score = 0
-    for w in bullish: 
-        if w in t: score += 1
-    for w in bearish: 
-        if w in t: score -= 1
-    if score > 0: return "Bullish"
-    if score < 0: return "Bearish"
-    return "Neutral"
 
-@app.get("/api/health")
-@limiter.limit("10/minute")
-async def health_check(request: Request): return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+@app.get("/api/market/bootstrap")
+async def get_market_bootstrap():
+    return {
+        "indices": GLOBAL_MARKET_CACHE["indices"],
+        "sectors": GLOBAL_MARKET_CACHE["sectors"],
+        "status": "hyper-ready"
+    }
 
-@app.get("/api/market/indices")
-@limiter.limit("30/minute")
-async def get_indices(request: Request):
-    indices = ["^NSEI", "^BSESN"]; results = []
-    for idx in indices:
-        try:
-            t = Ticker(idx); p = t.price.get(idx, {})
-            if p: results.append({"symbol": "NIFTY 50" if idx == "^NSEI" else "SENSEX", "price": p.get("regularMarketPrice"), "change": round(p.get("regularMarketChange", 0), 2), "percent_change": round(p.get("regularMarketChangePercent", 0) * 100, 2)})
-        except: continue
-    return results
-
-async def fetch_stock_data(ticker_symbol: str):
-    if ticker_symbol in stock_cache: return stock_cache[ticker_symbol]
-    symbols_to_try = [f"{ticker_symbol}.NS", f"{ticker_symbol}.BO"] if "." not in ticker_symbol else [ticker_symbol]
-    for sym in symbols_to_try:
-        try:
-            t = Ticker(sym); price_data = t.price
-            if isinstance(price_data, dict) and sym in price_data:
-                p = price_data[sym]; summary = t.summary_detail.get(sym, {})
-                if not p.get('regularMarketPrice'): continue
-                vol = p.get('regularMarketVolume', 0)
-                res = {"symbol": sym, "name": p.get('longName') or p.get('shortName') or ticker_symbol, "price": p.get('regularMarketPrice'), "currency": p.get('currency', 'INR'), "change": round(p.get('regularMarketChange', 0), 2), "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2), "high": p.get('regularMarketDayHigh'), "low": p.get('regularMarketDayLow'), "open": p.get('regularMarketOpen'), "volume": vol, "is_volume_spike": vol > 10000000, "market_cap": p.get('marketCap', 0), "pe_ratio": summary.get('trailingPE'), "fiftyTwoWeekHigh": summary.get('fiftyTwoWeekHigh'), "fiftyTwoWeekLow": summary.get('fiftyTwoWeekLow'), "dividendYield": summary.get('dividendYield', 0)}
-                stock_cache[ticker_symbol] = res; return res
-        except: continue
-    return None
-
-@app.get("/api/stock/{ticker}")
-@limiter.limit("60/minute")
-async def get_stock(request: Request, ticker: str):
-    data = await fetch_stock_data(ticker.upper().strip())
-    if data: return data
-    raise HTTPException(status_code=404, detail="Stock not found")
-
-@app.get("/api/stock/{ticker}/history")
-@limiter.limit("60/minute")
-async def get_stock_history(request: Request, ticker: str, period: str = "1mo", interval: str = "1d"):
-    ticker = ticker.upper().strip(); cache_key = f"{ticker}_h_{period}_{interval}"
-    if cache_key in history_cache: return history_cache[cache_key]
-    sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym); df = t.history(period=period, interval=interval)
-        if (df is None or (hasattr(df, 'empty') and df.empty)) and "." not in ticker:
-            sym = f"{ticker}.BO"; t = Ticker(sym); df = t.history(period=period, interval=interval)
-        if df is None or (hasattr(df, 'empty') and df.empty): return []
-        history = []; df = df.reset_index()
-        for _, row in df.iterrows():
-            date_val = row['date']; time_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') else str(date_val)
-            history.append({
-                "time": time_str, 
-                "open": round(row['open'], 2), 
-                "high": round(row['high'], 2), 
-                "low": round(row['low'], 2), 
-                "close": round(row['close'], 2),
-                "volume": int(row.get('volume', 0))
-            })
-        history_cache[cache_key] = history; return history
-    except: return []
-
-@app.get("/api/stock/{ticker}/fundamentals")
-@limiter.limit("20/minute")
-async def get_fundamentals(request: Request, ticker: str):
-    ticker = ticker.upper().strip(); sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym); is_stmt = t.income_statement(frequency="q")
-        if is_stmt is None or (hasattr(is_stmt, 'empty') and is_stmt.empty): return []
-        df = is_stmt.reset_index(); fundamentals = []
-        for _, row in df.tail(4).iterrows():
-            date_val = row['asOfDate']
-            fundamentals.append({"date": date_val.strftime('%b %Y') if hasattr(date_val, 'strftime') else str(date_val), "revenue": row.get('TotalRevenue'), "net_income": row.get('NetIncome'), "eps": row.get('BasicEPS')})
-        return fundamentals
-    except: return []
-
-@app.get("/api/stock/{ticker}/actions")
-@limiter.limit("20/minute")
-async def get_actions(request: Request, ticker: str):
-    ticker = ticker.upper().strip(); sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym); stats = t.key_stats.get(sym, {}); divs = []
-        try:
-            div_data = t.dividend_history()
-            if div_data is not None and not div_data.empty:
-                div_data = div_data.reset_index()
-                for _, row in div_data.tail(5).iterrows(): divs.append({"date": row['date'].strftime('%Y-%m-%d'), "amount": row['dividend']})
-        except: pass
-        return {"price_to_book": stats.get('priceToBook'), "beta": stats.get('beta'), "held_by_insiders": stats.get('heldPercentInsiders'), "trailing_eps": stats.get('trailingEps'), "dividends": divs}
-    except: return {}
-
-@app.get("/api/stock/{ticker}/peers")
-@limiter.limit("20/minute")
-async def get_peers(request: Request, ticker: str):
-    ticker = ticker.upper().strip(); sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym); trends = t.recommendation_trend; clean_trends = {}
-        if trends is not None and not (isinstance(trends, dict) and not trends):
-            df = trends.reset_index()
-            if not df.empty:
-                latest = df.iloc[0]
-                clean_trends = {"strong_buy": int(latest.get('strongBuy', 0)), "buy": int(latest.get('buy', 0)), "hold": int(latest.get('hold', 0)), "sell": int(latest.get('sell', 0)), "strong_sell": int(latest.get('strongSell', 0))}
-        recs = t.recommendations; peers = []
-        if recs and sym in recs:
-            for item in recs[sym].get('recommendedSymbols', []): peers.append({"symbol": item['symbol'].replace('.NS', '').replace('.BO', ''), "score": item['score']})
-        return {"trends": clean_trends, "peers": peers}
-    except: return {"trends": {}, "peers": []}
-
-@app.get("/api/stock/{ticker}/profile")
-@limiter.limit("20/minute")
-async def get_profile(request: Request, ticker: str):
-    ticker = ticker.upper().strip(); sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym); p = t.summary_profile.get(sym, {})
-        return {"sector": p.get('sector'), "industry": p.get('industry'), "summary": p.get('longBusinessSummary'), "website": p.get('website')}
-    except: return {}
-
-@app.get("/api/stock/{ticker}/news")
-@limiter.limit("30/minute")
-async def get_stock_news(request: Request, ticker: str):
-    ticker = ticker.upper().strip()
-    if ticker in news_cache: return news_cache[ticker]
-    try:
-        query = f"{ticker} stock price news India"
-        url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
-        async with httpx.AsyncClient(headers={'User-Agent': get_random_ua()}, follow_redirects=True) as client:
-            res = await client.get(url, timeout=10)
-            if res.status_code != 200: return []
-        root = ET.fromstring(res.content); items = []
-        for item in root.findall('.//item')[:10]:
-            source = item.find('source'); title = item.find('title').text
-            items.append({"title": title, "publisher": source.text if source is not None else "Financial News", "link": item.find('link').text, "providerPublishTime": int(time.time()), "sentiment": analyze_sentiment(title)})
-        if items: news_cache[ticker] = items
-        return items
-    except: return []
-
-@app.get("/api/market/news")
-@limiter.limit("30/minute")
-async def get_market_news(request: Request):
-    news = await get_stock_news(request, "Indian stock market")
-    bullish = sum(1 for item in news if item.get('sentiment') == 'Bullish')
-    bearish = sum(1 for item in news if item.get('sentiment') == 'Bearish')
-    overall = "Bullish" if bullish > bearish else "Bearish" if bearish > bullish else "Neutral"
-    return {"articles": news, "sentiment": overall, "score": (bullish - bearish)}
-
-@app.get("/api/stock/{ticker}/calendar")
-@limiter.limit("20/minute")
-async def get_calendar(request: Request, ticker: str):
-    ticker = ticker.upper().strip()
-    sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym)
-        cal = t.calendar_events.get(sym, {})
-        earnings = cal.get('earnings', {})
-        
-        dates = earnings.get('earningsDate', [])
-        clean_date = dates[0] if dates else None
-        
-        return {
-            "earnings_date": clean_date,
-            "ex_dividend_date": cal.get('exDividendDate'),
-            "revenue_avg": earnings.get('revenueAverage'),
-            "eps_avg": earnings.get('earningsAverage')
-        }
-    except:
-        return {}
-
-@app.get("/api/stock/{ticker}/holders")
-@limiter.limit("20/minute")
-async def get_holders(request: Request, ticker: str):
-    ticker = ticker.upper().strip()
-    sym = ticker if "." in ticker else f"{ticker}.NS"
-    try:
-        t = Ticker(sym)
-        holders = t.major_holders.get(sym, {})
-        return {
-            "insiders": holders.get('insidersPercentHeld', 0),
-            "institutions": holders.get('institutionsPercentHeld', 0),
-            "institutions_count": holders.get('institutionsCount', 0)
-        }
-    except:
-        return {}
 
 @app.get("/api/search/suggestions")
-@limiter.limit("120/minute")
-async def get_suggestions(request: Request, query: str = ""):
-    if not query or len(query) < 2: return []
+async def get_suggestions(query: str = ""):
+    query = query.upper().strip()
+    if len(query) < 2:
+        return []
     try:
-        search_results = search(query); results = []; seen = set()
-        if 'quotes' in search_results:
-            for quote in search_results['quotes']:
-                symbol = quote.get('symbol', ''); clean = symbol.replace('.NS', '').replace('.BO', '')
-                if clean in seen: continue
-                if symbol.endswith('.NS') or symbol.endswith('.BO'):
-                    results.append({"symbol": clean, "name": quote.get('longname') or quote.get('shortname') or symbol, "exchange": "NSE" if symbol.endswith('.NS') else "BSE"})
-                    seen.add(clean)
-        return results[:10]
-    except: return []
+        results = await asyncio.to_thread(search, f"{query} NSE")
+        quotes = []
+        for q in results.get('quotes', []):
+            sym = q.get('symbol', '')
+            if sym.endswith('.NS') or sym.endswith('.BO'):
+                quotes.append({
+                    "symbol": sym.replace('.NS', '').replace('.BO', ''),
+                    "name": q.get('longname') or q.get('shortname'),
+                    "exchange": "NSE" if sym.endswith('.NS') else "BSE"
+                })
+        return quotes[:10]
+    except Exception as e:
+        logger.warning(f"Search suggestions failed for query '{query}': {e}")
+        return []
+
+
+@app.get("/api/stock/{ticker}")
+async def get_stock(ticker: str):
+    ticker = validate_ticker(ticker)
+    if ticker in STOCK_DETAIL_CACHE:
+        return STOCK_DETAIL_CACHE[ticker]
+
+    try:
+        sym = f"{ticker}.NS"
+        t = await asyncio.to_thread(Ticker, [sym, f"{ticker}.BO"])
+        p_data = t.price
+        p = p_data.get(sym, p_data.get(f"{ticker}.BO", {}))
+
+        if not p or not p.get('regularMarketPrice'):
+            raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found")
+
+        summary = t.summary_detail.get(sym, t.summary_detail.get(f"{ticker}.BO", {}))
+        res = {
+            "symbol": sym if sym in p_data else f"{ticker}.BO",
+            "name": p.get('longName') or ticker,
+            "price": p.get('regularMarketPrice'),
+            "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2),
+            "change": round(p.get('regularMarketChange', 0), 2),
+            "market_cap": p.get('marketCap'),
+            "pe_ratio": summary.get('trailingPE'),
+            "fiftyTwoWeekHigh": summary.get('fiftyTwoWeekHigh'),
+            "fiftyTwoWeekLow": summary.get('fiftyTwoWeekLow')
+        }
+        STOCK_DETAIL_CACHE[ticker] = res
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch stock '{ticker}': {e}")
+        raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found")
+
+
+@app.get("/api/stock/{ticker}/history")
+async def get_history(ticker: str, period: str = "1mo", interval: str = "1d"):
+    ticker = validate_ticker(ticker)
+    cache_key = f"{ticker}_{period}_{interval}"
+    if cache_key in HISTORY_CACHE:
+        return HISTORY_CACHE[cache_key]
+
+    sym = ticker if "." in ticker else f"{ticker}.NS"
+    try:
+        t = await asyncio.to_thread(Ticker, sym)
+        df = t.history(period=period, interval=interval)
+        if df is None or (hasattr(df, 'empty') and df.empty):
+            return []
+
+        history = []
+        df = df.reset_index()
+        for _, row in df.iterrows():
+            history.append({
+                "time": row['date'].strftime('%Y-%m-%d'),
+                "open": round(row['open'], 2), "high": round(row['high'], 2),
+                "low": round(row['low'], 2), "close": round(row['close'], 2)
+            })
+        HISTORY_CACHE[cache_key] = history
+        return history
+    except Exception as e:
+        logger.error(f"Failed to fetch history for '{ticker}' (period={period}): {e}")
+        return []
+
+
+@app.get("/api/stock/{ticker}/peers")
+async def get_peers(ticker: str):
+    """Return same-sector peer stocks for a given ticker."""
+    ticker = validate_ticker(ticker)
+    if ticker in PEERS_CACHE:
+        return PEERS_CACHE[ticker]
+
+    try:
+        sym = f"{ticker}.NS"
+        t = await asyncio.to_thread(Ticker, sym)
+        profile = t.asset_profile.get(sym, {})
+        sector = profile.get("sector") if isinstance(profile, dict) else None
+
+        # Find sector peers; fall back to Nifty 50 blue chips
+        if sector and sector in SECTOR_PEERS:
+            peer_symbols = [s for s in SECTOR_PEERS[sector] if s != ticker][:5]
+        else:
+            peer_symbols = [s for s in ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"] if s != ticker][:5]
+
+        # Fetch current prices for peers
+        ns_syms = [f"{s}.NS" for s in peer_symbols]
+        pt = await asyncio.to_thread(Ticker, ns_syms)
+        p_data = pt.price
+
+        peers = []
+        for s, ns in zip(peer_symbols, ns_syms):
+            p = p_data.get(ns, {})
+            if p and p.get('regularMarketPrice'):
+                peers.append({
+                    "symbol": s,
+                    "name": p.get('longName') or s,
+                    "price": p.get('regularMarketPrice'),
+                    "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2)
+                })
+
+        result = {"sector": sector or "Unknown", "peers": peers}
+        PEERS_CACHE[ticker] = result
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch peers for '{ticker}': {e}")
+        return {"sector": "Unknown", "peers": []}
+
+
+@app.get("/api/stock/{ticker}/news")
+async def get_news(ticker: str):
+    """Return recent news articles for a given ticker."""
+    ticker = validate_ticker(ticker)
+    if ticker in NEWS_CACHE:
+        return NEWS_CACHE[ticker]
+
+    try:
+        sym = f"{ticker}.NS"
+        t = await asyncio.to_thread(Ticker, sym)
+        raw_news = t.news(count=10)
+
+        articles = []
+        for item in (raw_news or []):
+            articles.append({
+                "title": item.get("title", ""),
+                "publisher": item.get("publisher", ""),
+                "link": item.get("link", ""),
+                "providerPublishTime": item.get("providerPublishTime", 0),
+                "sentiment": "Neutral"
+            })
+
+        NEWS_CACHE[ticker] = articles
+        return articles
+    except Exception as e:
+        logger.error(f"Failed to fetch news for '{ticker}': {e}")
+        return []
+
+
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "hyper-optimized",
+        "cache_last_updated": GLOBAL_MARKET_CACHE["last_updated"]
+    }
+
 
 if __name__ == "__main__":
     import uvicorn

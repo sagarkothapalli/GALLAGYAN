@@ -25,11 +25,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "GallaGyan | Live NSE/BSE Stock Market Data & Analysis",
     description: "Real-time Indian stock market dashboard. Live prices, charts, and news.",
-    url: "https://gallagyan.com",
+    url: "https://gallagyan.xyz",
     siteName: "GallaGyan",
     images: [
       {
-        url: "https://gallagyan.com/og-image.jpg",
+        url: "https://gallagyan.xyz/og-image.jpg",
         width: 1200,
         height: 630,
         alt: "GallaGyan - Indian Stock Market Dashboard",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "GallaGyan | Live NSE/BSE Stock Market Data",
     description: "Real-time Indian stock market dashboard. Live prices, charts, and breaking financial news.",
-    images: ["https://gallagyan.com/og-image.jpg"],
+    images: ["https://gallagyan.xyz/og-image.jpg"],
   },
   robots: {
     index: true,
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: "https://gallagyan.com",
+    canonical: "https://gallagyan.xyz",
   },
 };
 
@@ -77,10 +77,10 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "WebSite",
               "name": "GallaGyan",
-              "url": "https://gallagyan.com",
+              "url": "https://gallagyan.xyz",
               "potentialAction": {
                 "@type": "SearchAction",
-                "target": "https://gallagyan.com/?q={search_term_string}",
+                "target": "https://gallagyan.xyz/?q={search_term_string}",
                 "query-input": "required name=search_term_string"
               }
             }),
@@ -94,7 +94,7 @@ export default function RootLayout({
               "@type": "FinancialService",
               "name": "GallaGyan",
               "description": "Real-time Indian stock market (NSE/BSE) dashboard and educational platform.",
-              "url": "https://gallagyan.com",
+              "url": "https://gallagyan.xyz",
               "areaServed": "IN",
               "address": {
                 "@type": "PostalAddress",
@@ -110,8 +110,8 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "GallaGyan",
-              "url": "https://gallagyan.com",
-              "logo": "https://gallagyan.com/logo.png",
+              "url": "https://gallagyan.xyz",
+              "logo": "https://gallagyan.xyz/logo.png",
               "sameAs": [
                 "https://github.com/kothapallianandsagar"
               ],

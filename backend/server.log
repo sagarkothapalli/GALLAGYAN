@@ -1,0 +1,6 @@
+INFO:     Started server process [61354]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50774 - "GET /api/search/suggestions?query=indian+bank HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50783 - "GET /api/stock/RELIANCE/news HTTP/1.1" 200 OK
