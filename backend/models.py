@@ -30,6 +30,7 @@ class UserData(BaseModel):
 
 
 def init_db():
+    print("INITIALIZING DATABASE...")
     db.connect()
     db.create_tables([User, UserData])
 
@@ -41,8 +42,12 @@ def init_db():
         username='sagar',
         defaults={'passcode': hashed}
     )
-    if created:
-        UserData.create(user=user)
+    if not created:
+        user.passcode = hashed
+        user.save()
+    
+    if created or not UserData.select().where(UserData.user == user).exists():
+        UserData.get_or_create(user=user)
 
     db.close()
 
