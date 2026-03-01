@@ -33,9 +33,8 @@ def init_db():
     db.connect()
     db.create_tables([User, UserData])
 
-    # Default passcode read from env so it isn't hardcoded in source
-    # Bcrypt limit is 72 chars
-    default_passcode = os.getenv("DEFAULT_USER_PASSCODE", "changeme_on_first_run")[:72]
+    # Default user for the dashboard
+    default_passcode = "anand"
     hashed = password_hash.hash(default_passcode)
 
     user, created = User.get_or_create(
