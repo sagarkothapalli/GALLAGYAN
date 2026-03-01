@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pwdlib/hashers/argon2.py", line 4, in <module>
+    import argon2.exceptions
+ModuleNotFoundError: No module named 'argon2'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Volumes/Untitled/market/india-finance-app/backend/main.py", line 17, in <module>
+    import auth
+  File "/Volumes/Untitled/market/india-finance-app/backend/auth.py", line 11, in <module>
+    from models import User, UserData, db
+  File "/Volumes/Untitled/market/india-finance-app/backend/models.py", line 10, in <module>
+    password_hash = PasswordHash.recommended()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pwdlib/_hash.py", line 38, in recommended
+    from .hashers.argon2 import Argon2Hasher
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/pwdlib/hashers/argon2.py", line 9, in <module>
+    raise HasherNotAvailable("argon2") from e
+pwdlib.exceptions.HasherNotAvailable: The argon2 hash algorithm is not available. Are you sure it's installed? Try to run `pip install pwdlib[argon2]`.

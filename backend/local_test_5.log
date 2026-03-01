@@ -1,0 +1,10 @@
+2026-03-01 15:12:02,972 [INFO] gallagyan: CORS allowed origins: ['https://gallagyan.xyz', 'https://www.gallagyan.xyz', 'http://localhost:3000']
+INFO:     Started server process [16636]
+INFO:     Waiting for application startup.
+2026-03-01 15:12:03,007 [INFO] gallagyan: GallaGyan API starting up
+2026-03-01 15:12:03,225 [INFO] gallagyan: Database initialized successfully
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): [errno 48] address already in use
+INFO:     Waiting for application shutdown.
+2026-03-01 15:12:03,226 [INFO] gallagyan: GallaGyan API shut down
+INFO:     Application shutdown complete.

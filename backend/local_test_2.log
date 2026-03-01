@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Volumes/Untitled/market/india-finance-app/backend/main.py", line 5, in <module>
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+ModuleNotFoundError: No module named 'slowapi'

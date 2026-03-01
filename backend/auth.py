@@ -2,7 +2,8 @@ from fastapi import APIRouter, HTTPException, status, Depends, Header
 from pydantic import BaseModel
 from typing import Optional, List
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 from datetime import datetime, timedelta
 import json
 import os
@@ -23,7 +24,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 # TODO: Implement refresh tokens to avoid silent logouts on expiry
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+password_hash = PasswordHash((BcryptHasher(),))
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -67,7 +68,7 @@ async def login(request: LoginRequest):
     username = request.username.lower()
     try:
         user = User.get(User.username == username)
-        if pwd_context.verify(request.passcode, user.passcode):
+        if password_hash.verify(request.passcode[:72], user.passcode):
             access_token = create_access_token(data={"sub": username})
 
             # Ensure UserData exists

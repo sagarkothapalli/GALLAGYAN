@@ -1,5 +1,6 @@
 from peewee import *
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 import os
 import json
 
@@ -7,7 +8,7 @@ import json
 db_path = os.path.join(os.path.dirname(__file__), "gallagyan.db")
 db = SqliteDatabase(db_path)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+password_hash = PasswordHash((BcryptHasher(),))
 
 
 class BaseModel(Model):
@@ -17,7 +18,7 @@ class BaseModel(Model):
 
 class User(BaseModel):
     username = CharField(unique=True)
-    passcode = CharField()  # bcrypt hashed
+    passcode = CharField()  # pwdlib hashed
     created_at = DateTimeField(constraints=[SQL('DEFAULT CURRENT_TIMESTAMP')])
 
 
@@ -33,8 +34,9 @@ def init_db():
     db.create_tables([User, UserData])
 
     # Default passcode read from env so it isn't hardcoded in source
-    default_passcode = os.getenv("DEFAULT_USER_PASSCODE", "changeme_on_first_run")
-    hashed = pwd_context.hash(default_passcode)
+    # Bcrypt limit is 72 chars
+    default_passcode = os.getenv("DEFAULT_USER_PASSCODE", "changeme_on_first_run")[:72]
+    hashed = password_hash.hash(default_passcode)
 
     user, created = User.get_or_create(
         username='sagar',

@@ -8,7 +8,7 @@ pandas
 numpy
 yfinance
 python-dotenv
-passlib[bcrypt]
+pwdlib[bcrypt]
 python-jose[cryptography]
 lxml
 beautifulsoup4

@@ -1,0 +1,16 @@
+2026-03-01 15:08:00,306 [INFO] gallagyan: CORS allowed origins: ['https://gallagyan.xyz', 'https://www.gallagyan.xyz', 'http://localhost:3000']
+INFO:     Started server process [16566]
+INFO:     Waiting for application startup.
+2026-03-01 15:08:00,383 [INFO] gallagyan: GallaGyan API starting up
+2026-03-01 15:08:00,384 [WARNING] passlib.handlers.bcrypt: (trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Volumes/Untitled/market/india-finance-app/backend/venv/lib/python3.13/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+2026-03-01 15:08:00,391 [ERROR] gallagyan: Failed to initialize database: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
+INFO:     Application startup complete.
+ERROR:    [Errno 48] error while attempting to bind on address ('0.0.0.0', 8000): [errno 48] address already in use
+INFO:     Waiting for application shutdown.
+2026-03-01 15:08:00,392 [INFO] gallagyan: GallaGyan API shut down
+INFO:     Application shutdown complete.
