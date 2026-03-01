@@ -15,9 +15,9 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # JWT Configuration — loaded from environment, never hardcoded
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
 if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET_KEY environment variable is not set. See .env.example.")
+    raise RuntimeError("JWT_SECRET_KEY or JWT_SECRET environment variable is not set. See .env.example.")
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
