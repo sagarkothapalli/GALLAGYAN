@@ -116,7 +116,7 @@ const StockChart = dynamic(() => import('@/components/StockChart').then(mod => m
 });
 
 // ─── Constants ─────────────────────────────────────────────────────────────
-const BASE_URL_FALLBACK = 'http://localhost:8000';
+const BASE_URL_FALLBACK = 'https://gallagyan.onrender.com';
 const QUICK_STOCKS = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'LICI', 'ITC', 'HINDUNILVR'];
 const PERIODS: PeriodOption[] = [
   { label: '1D', value: '1d', interval: '1m' },

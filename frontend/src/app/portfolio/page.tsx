@@ -75,7 +75,7 @@ type TooltipKey = 'stt' | 'stcg' | 'ltcg' | null;
 
 // ── API base ──────────────────────────────────────────────────────────────────
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://gallagyan.onrender.com';
 
 // ── Helpers to convert between localStorage shape and internal shape ──────────
 

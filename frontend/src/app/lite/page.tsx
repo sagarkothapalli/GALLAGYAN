@@ -37,8 +37,8 @@ export default function LiteHome() {
       if (cleanSymbol.includes('IDFCFIRST')) cleanSymbol = 'IDFCFIRSTB';
 
       const [stockRes, newsRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${cleanSymbol}`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/stock/${cleanSymbol}/news`)
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://gallagyan.onrender.com'}/api/stock/${cleanSymbol}`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://gallagyan.onrender.com'}/api/stock/${cleanSymbol}/news`)
       ]);
 
       if (!stockRes.ok) throw new Error('Stock not found');
