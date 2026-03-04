@@ -1,6 +1,6 @@
 'use client';
 
-import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, ColorType, IChartApi, CandlestickSeries, LineSeries, HistogramSeries, UTCTimestamp } from 'lightweight-charts';
 import React, { useEffect, useRef } from 'react';
 
 interface ChartData {
@@ -10,6 +10,19 @@ interface ChartData {
   low: number;
   close: number;
   volume?: number;
+}
+
+/** Convert time string to UTCTimestamp (unix seconds) — required by lightweight-charts v5.
+ *  Daily data ("2024-01-15") → parsed as UTC midnight.
+ *  Intraday data ("2024-01-15 09:15") → parsed as IST (UTC+5:30).
+ */
+function parseTime(timeStr: string): UTCTimestamp {
+  if (timeStr.includes(' ')) {
+    const d = new Date(timeStr.replace(' ', 'T') + ':00+05:30');
+    return Math.floor(d.getTime() / 1000) as UTCTimestamp;
+  }
+  const d = new Date(timeStr + 'T00:00:00Z');
+  return Math.floor(d.getTime() / 1000) as UTCTimestamp;
 }
 
 interface StockChartProps {
@@ -119,30 +132,33 @@ export const StockChart = ({ data, comparisonData, showSMA20 = false, showSMA50 
       height: chartHeight,
     });
 
-    const candlestickSeries = chart.addSeries(CandlestickSeries, { upColor: '#10b981', downColor: '#f43f5e', borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#f43f5e' });
-    candlestickSeries.setData(data);
+    const parsed = data.map(d => ({ ...d, time: parseTime(d.time) }));
+    const parseT = (t: string) => parseTime(t);
 
-    if (showSMA20 && data.length >= 20) { const s = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 2, title: 'SMA 20' }); s.setData(calculateSMA(data, 20)); }
-    if (showSMA50 && data.length >= 50) { const s = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 2, title: 'SMA 50' }); s.setData(calculateSMA(data, 50)); }
-    if (showEMA9 && data.length >= 9) { const s = chart.addSeries(LineSeries, { color: '#ec4899', lineWidth: 2, title: 'EMA 9' }); s.setData(calculateEMA(data, 9).slice(8)); }
-    if (showEMA21 && data.length >= 21) { const s = chart.addSeries(LineSeries, { color: '#8b5cf6', lineWidth: 2, title: 'EMA 21' }); s.setData(calculateEMA(data, 21).slice(20)); }
+    const candlestickSeries = chart.addSeries(CandlestickSeries, { upColor: '#10b981', downColor: '#f43f5e', borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#f43f5e' });
+    candlestickSeries.setData(parsed);
+
+    if (showSMA20 && data.length >= 20) { const s = chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 2, title: 'SMA 20' }); s.setData(calculateSMA(data, 20).map(d => ({ time: parseT(d.time as string), value: d.value }))); }
+    if (showSMA50 && data.length >= 50) { const s = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 2, title: 'SMA 50' }); s.setData(calculateSMA(data, 50).map(d => ({ time: parseT(d.time as string), value: d.value }))); }
+    if (showEMA9 && data.length >= 9) { const s = chart.addSeries(LineSeries, { color: '#ec4899', lineWidth: 2, title: 'EMA 9' }); s.setData(calculateEMA(data, 9).slice(8).map(d => ({ time: parseT(d.time as string), value: d.value }))); }
+    if (showEMA21 && data.length >= 21) { const s = chart.addSeries(LineSeries, { color: '#8b5cf6', lineWidth: 2, title: 'EMA 21' }); s.setData(calculateEMA(data, 21).slice(20).map(d => ({ time: parseT(d.time as string), value: d.value }))); }
 
     if (comparisonData && comparisonData.points.length > 0) {
         const compSeries = chart.addSeries(LineSeries, { color: '#6366f1', lineWidth: 2, title: comparisonData.symbol, priceScaleId: 'comparison' });
         chart.priceScale('comparison').applyOptions({ scaleMargins: { top: 0.1, bottom: 0.1 } });
-        compSeries.setData(comparisonData.points.map(p => ({ time: p.time, value: p.close })));
+        compSeries.setData(comparisonData.points.map(p => ({ time: parseT(p.time), value: p.close })));
     }
 
     if (showVolume) {
         const volumeSeries = chart.addSeries(HistogramSeries, { color: '#26a69a', priceFormat: { type: 'volume' }, priceScaleId: 'volume' });
         chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-        volumeSeries.setData(data.map(d => ({ time: d.time, value: d.volume || 0, color: d.close >= d.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)' })));
+        volumeSeries.setData(parsed.map(d => ({ time: d.time, value: d.volume || 0, color: d.close >= d.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(244, 63, 94, 0.3)' })));
     }
 
     if (showRSI && data.length > 14) {
         const rsiSeries = chart.addSeries(LineSeries, { color: '#6366f1', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi' });
         chart.priceScale('rsi').applyOptions({ mode: 0, autoScale: false, scaleMargins: { top: 0.1, bottom: 0.7 } });
-        rsiSeries.setData(calculateRSI(data));
+        rsiSeries.setData(calculateRSI(data).map(d => ({ time: parseT(d.time as string), value: d.value })));
     }
 
     if (showMACD && data.length > 26) {
@@ -150,11 +166,11 @@ export const StockChart = ({ data, comparisonData, showSMA20 = false, showSMA50 
         const macdSeries = chart.addSeries(LineSeries, { color: '#2563eb', lineWidth: 2, title: 'MACD', priceScaleId: 'macd' });
         const signalSeries = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 2, title: 'Signal', priceScaleId: 'macd' });
         const histSeries = chart.addSeries(HistogramSeries, { priceScaleId: 'macd' });
-        
+
         chart.priceScale('macd').applyOptions({ scaleMargins: { top: 0.7, bottom: 0.1 } });
-        macdSeries.setData(macd);
-        signalSeries.setData(signal);
-        histSeries.setData(hist);
+        macdSeries.setData(macd.map(d => ({ time: parseT(d.time as string), value: d.value })));
+        signalSeries.setData(signal.map(d => ({ time: parseT(d.time as string), value: d.value })));
+        histSeries.setData(hist.map(d => ({ time: parseT(d.time as string), value: d.value, color: d.color })));
     }
 
     chart.timeScale().fitContent();

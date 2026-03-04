@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: gallagyan
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://gallagyan.xyz,https://www.gallagyan.xyz,https://gallagyan-frontend-kothapallianandsagar-7922s-projects.vercel.app
+      - key: ENVIRONMENT
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: DEFAULT_USER_PASSCODE
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.0"

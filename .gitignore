@@ -11,3 +11,7 @@ __pycache__/
 .DS_Store
 venv/
 .venv/
+*.log
+*.log.*
+node_modules/
+.next/

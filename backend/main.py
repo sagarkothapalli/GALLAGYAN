@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -17,6 +18,7 @@ import logging
 import auth
 from models import db
 from dotenv import load_dotenv
+from app.api.v1.router import api_router
 
 load_dotenv()
 
@@ -30,9 +32,8 @@ logger = logging.getLogger("gallagyan")
 # Ticker symbol whitelist pattern
 TICKER_PATTERN = re.compile(r'^[A-Z0-9.\-&]{1,20}$')
 
-# CORS — loaded from environment, never wildcard in production
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "https://gallagyan.xyz,https://www.gallagyan.xyz,http://localhost:3000")
-ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+# CORS — single source of truth from security.py
+from security import ALLOWED_ORIGINS
 logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 
@@ -79,10 +80,11 @@ SECTOR_PEERS = {
 
 async def refresh_market_data():
     """Background engine keeping market data ready in memory."""
+    await asyncio.sleep(1)  # Let the server start fully before first fetch
     while True:
         try:
             all_syms = INDEX_SYMBOLS + list(SECTOR_MAP.keys()) + HOT_STOCKS
-            t = await asyncio.to_thread(Ticker, all_syms)
+            t = await asyncio.wait_for(asyncio.to_thread(Ticker, all_syms), timeout=30)
             p_data = t.price
 
             # 1. Update Indices
@@ -165,6 +167,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(api_router)
 
 
 def validate_ticker(ticker: str) -> str:
@@ -178,8 +181,16 @@ def validate_ticker(ticker: str) -> str:
     return clean
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catch-all handler to prevent stack traces from leaking to clients."""
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 @app.get("/api/market/bootstrap")
-async def get_market_bootstrap():
+@limiter.limit("30/minute")
+async def get_market_bootstrap(request: Request):
     return {
         "indices": GLOBAL_MARKET_CACHE["indices"],
         "sectors": GLOBAL_MARKET_CACHE["sectors"],
@@ -188,7 +199,8 @@ async def get_market_bootstrap():
 
 
 @app.get("/api/search/suggestions")
-async def get_suggestions(query: str = ""):
+@limiter.limit("30/minute")
+async def get_suggestions(request: Request, query: str = ""):
     query = query.upper().strip()
     if len(query) < 2:
         return []
@@ -210,7 +222,8 @@ async def get_suggestions(query: str = ""):
 
 
 @app.get("/api/stock/{ticker}")
-async def get_stock(ticker: str):
+@limiter.limit("30/minute")
+async def get_stock(request: Request, ticker: str):
     ticker = validate_ticker(ticker)
     if ticker in STOCK_DETAIL_CACHE:
         return STOCK_DETAIL_CACHE[ticker]
@@ -245,9 +258,18 @@ async def get_stock(ticker: str):
         raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found")
 
 
+VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
+VALID_INTERVALS = {"1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"}
+
+
 @app.get("/api/stock/{ticker}/history")
-async def get_history(ticker: str, period: str = "1mo", interval: str = "1d"):
+@limiter.limit("30/minute")
+async def get_history(request: Request, ticker: str, period: str = "1mo", interval: str = "1d"):
     ticker = validate_ticker(ticker)
+    if period not in VALID_PERIODS:
+        raise HTTPException(status_code=400, detail=f"Invalid period '{period}'")
+    if interval not in VALID_INTERVALS:
+        raise HTTPException(status_code=400, detail=f"Invalid interval '{interval}'")
     cache_key = f"{ticker}_{period}_{interval}"
     if cache_key in HISTORY_CACHE:
         return HISTORY_CACHE[cache_key]
@@ -261,11 +283,15 @@ async def get_history(ticker: str, period: str = "1mo", interval: str = "1d"):
 
         history = []
         df = df.reset_index()
+        date_col = 'date' if 'date' in df.columns else 'datetime'
         for _, row in df.iterrows():
+            ts = row[date_col]
+            time_str = ts.strftime('%Y-%m-%d %H:%M') if hasattr(ts, 'hour') and ts.hour > 0 else ts.strftime('%Y-%m-%d')
             history.append({
-                "time": row['date'].strftime('%Y-%m-%d'),
+                "time": time_str,
                 "open": round(row['open'], 2), "high": round(row['high'], 2),
-                "low": round(row['low'], 2), "close": round(row['close'], 2)
+                "low": round(row['low'], 2), "close": round(row['close'], 2),
+                "volume": int(row['volume']) if 'volume' in df.columns else 0
             })
         HISTORY_CACHE[cache_key] = history
         return history
@@ -275,7 +301,8 @@ async def get_history(ticker: str, period: str = "1mo", interval: str = "1d"):
 
 
 @app.get("/api/stock/{ticker}/peers")
-async def get_peers(ticker: str):
+@limiter.limit("30/minute")
+async def get_peers(request: Request, ticker: str):
     """Return same-sector peer stocks for a given ticker."""
     ticker = validate_ticker(ticker)
     if ticker in PEERS_CACHE:
@@ -318,7 +345,8 @@ async def get_peers(ticker: str):
 
 
 @app.get("/api/stock/{ticker}/news")
-async def get_news(ticker: str):
+@limiter.limit("30/minute")
+async def get_news(request: Request, ticker: str):
     """Return recent news articles for a given ticker."""
     ticker = validate_ticker(ticker)
     if ticker in NEWS_CACHE:
@@ -347,9 +375,10 @@ async def get_news(ticker: str):
 
 
 @app.get("/api/health")
-async def health():
+async def health_check():
     return {
-        "status": "hyper-optimized",
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
         "cache_last_updated": GLOBAL_MARKET_CACHE["last_updated"]
     }
 
