@@ -437,10 +437,10 @@ function TaxModal({
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.88, opacity: 0, y: 24 }}
         transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
-        className="w-full max-w-lg"
+        className="w-full max-w-lg max-h-[92vh] flex flex-col"
       >
         <div
-          className="relative rounded-2xl md:rounded-[2.5rem] border overflow-hidden"
+          className="relative rounded-2xl md:rounded-[2.5rem] border overflow-y-auto"
           style={{
             background:           'rgba(8,8,8,0.96)',
             backdropFilter:       'blur(40px)',
