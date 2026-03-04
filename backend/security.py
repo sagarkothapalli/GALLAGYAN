@@ -21,16 +21,11 @@ logger = logging.getLogger(__name__)
 
 # ── JWT Configuration ──────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET")
-if not SECRET_KEY:
-    raise RuntimeError(
-        "JWT_SECRET_KEY or JWT_SECRET environment variable is not set. "
-        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
-    )
-
-if len(SECRET_KEY) < 32:
-    raise RuntimeError(
-        "JWT_SECRET_KEY must be at least 32 characters. "
-        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+    SECRET_KEY = secrets.token_hex(32)
+    logger.warning(
+        "JWT_SECRET_KEY not set or too short — generated ephemeral key. "
+        "Sessions will not survive restarts. Set JWT_SECRET_KEY env var for production."
     )
 
 ALGORITHM = "HS256"
