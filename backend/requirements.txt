@@ -1,8 +1,5 @@
-alembic==1.13.3
-annotated-doc
 annotated-types
 anyio==4.12.1
-asyncpg==0.29.0
 beautifulsoup4
 cachetools==7.0.1
 certifi
@@ -26,16 +23,13 @@ passlib[bcrypt]==1.7.4
 peewee
 platformdirs
 protobuf
-psycopg2-binary==2.9.9
 pwdlib[bcrypt]
 pycparser
 pydantic_core==2.41.5
 pydantic-settings==2.5.2
 pydantic==2.12.5
 python-dateutil
-python-dotenv
 python-dotenv==1.0.1
-python-jose[cryptography]
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.12
 pytz
@@ -46,7 +40,6 @@ sgmllib3k
 six
 slowapi
 soupsieve
-sqlalchemy==2.0.35
 starlette==0.52.1
 tqdm
 typing_extensions
