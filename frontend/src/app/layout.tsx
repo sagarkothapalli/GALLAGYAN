@@ -134,11 +134,12 @@ export default function RootLayout({
           }}
         />
         {/* Global Educational Notice Banner */}
-        <div className="bg-blue-600/10 border-b border-blue-500/20 py-2.5 px-4 sticky top-0 z-[100] backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto flex items-center justify-center gap-2 text-center">
-            <span className="text-blue-400 text-xs">⚠️</span>
-            <p className="text-[9px] md:text-[10px] font-black text-blue-300 uppercase tracking-[0.2em] leading-tight">
-              GallaGyan Notice: Educational Purpose Only. No Financial Advice or Tips Provided.
+        <div className="bg-blue-600/10 border-b border-blue-500/20 py-2 md:py-2.5 px-3 md:px-4 sticky top-0 z-[100] backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto flex items-center justify-center gap-1.5 md:gap-2 text-center">
+            <span className="text-blue-400 text-xs flex-shrink-0">⚠️</span>
+            <p className="text-[9px] md:text-[10px] font-black text-blue-300 uppercase tracking-[0.1em] md:tracking-[0.2em] leading-tight">
+              <span className="hidden sm:inline">GallaGyan Notice: Educational Purpose Only. No Financial Advice or Tips Provided.</span>
+              <span className="sm:hidden">Educational Only. Not Financial Advice.</span>
             </p>
           </div>
         </div>

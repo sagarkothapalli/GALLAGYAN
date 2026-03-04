@@ -240,7 +240,7 @@ function GlassCard({
       whileHover={hover ? { y: -3, scale: 1.01 } : undefined}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className={cn(
-        'relative rounded-[2.5rem] border overflow-hidden',
+        'relative rounded-2xl md:rounded-[2.5rem] border overflow-hidden',
         onClick && 'cursor-pointer',
         className,
       )}
@@ -293,8 +293,8 @@ function SummaryCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
     >
-      <GlassCard hover className="p-6">
-        <div className="flex items-start justify-between mb-4">
+      <GlassCard hover className="p-4 md:p-6">
+        <div className="flex items-start justify-between mb-3 md:mb-4">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
             {label}
           </span>
@@ -305,7 +305,7 @@ function SummaryCard({
             <Icon size={17} style={{ color: accentStyles.color }} strokeWidth={2.5} />
           </div>
         </div>
-        <div className="text-2xl font-black text-white leading-none" style={{ color: accentStyles.color }}>
+        <div className="text-xl md:text-2xl font-black text-white leading-none" style={{ color: accentStyles.color }}>
           {value}
         </div>
         {subtext && (
@@ -356,7 +356,7 @@ function InfoTooltip({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.88, y: 8 }}
           transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
-          className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 z-50 w-72"
+          className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-3 z-50 w-64 sm:w-72"
           role="tooltip"
         >
           <div
@@ -440,7 +440,7 @@ function TaxModal({
         className="w-full max-w-lg"
       >
         <div
-          className="relative rounded-[2.5rem] border overflow-hidden"
+          className="relative rounded-2xl md:rounded-[2.5rem] border overflow-hidden"
           style={{
             background:           'rgba(8,8,8,0.96)',
             backdropFilter:       'blur(40px)',
@@ -456,7 +456,7 @@ function TaxModal({
             aria-hidden="true"
           />
 
-          <div className="p-8">
+          <div className="p-5 md:p-8">
             {/* Header */}
             <div className="flex items-start justify-between mb-6">
               <div>
@@ -470,7 +470,7 @@ function TaxModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-2.5 rounded-xl border border-white/[0.08] text-slate-500 hover:text-white hover:border-white/20 transition-all duration-200"
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl border border-white/[0.08] text-slate-500 hover:text-white hover:border-white/20 transition-all duration-200"
                 aria-label="Close"
               >
                 <X size={16} />
@@ -479,7 +479,7 @@ function TaxModal({
 
             {/* Position summary strip */}
             <div
-              className="rounded-2xl p-4 mb-6 grid grid-cols-3 gap-4"
+              className="rounded-2xl p-3 md:p-4 mb-5 md:mb-6 grid grid-cols-3 gap-3 md:gap-4"
               style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               <div>
@@ -605,7 +605,7 @@ function TaxModal({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-black text-amber-400">
+                  <p className="text-lg md:text-2xl font-black text-amber-400">
                     {fmtINR(breakdown.netInHand)}
                   </p>
                 </div>
@@ -656,12 +656,12 @@ function PositionCard({
       transition={{ delay: index * 0.07, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
       <GlassCard className="p-0 overflow-hidden" hover>
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {/* Top row: symbol + holding badge + delete */}
-          <div className="flex items-start justify-between mb-5">
+          <div className="flex items-start justify-between mb-4 md:mb-5">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
-                <h3 className="text-xl font-black text-white tracking-tight">{pos.symbol}</h3>
+                <h3 className="text-lg md:text-xl font-black text-white tracking-tight">{pos.symbol}</h3>
                 {/* Holding period badge */}
                 <span className={cn(
                   'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border flex-shrink-0',
@@ -677,7 +677,7 @@ function PositionCard({
             </div>
             <button
               onClick={() => onDelete(pos.id)}
-              className="p-2 rounded-xl text-slate-700 hover:text-rose-400 hover:bg-rose-400/10 transition-all duration-200 flex-shrink-0 ml-3"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-700 hover:text-rose-400 hover:bg-rose-400/10 transition-all duration-200 flex-shrink-0 ml-2"
               aria-label={`Remove ${pos.symbol} from portfolio`}
             >
               <Trash2 size={14} />
@@ -685,7 +685,7 @@ function PositionCard({
           </div>
 
           {/* Metrics grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-5">
             <div>
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-1">Units</p>
               <p className="text-sm font-black text-white">{pos.quantity}</p>
@@ -705,25 +705,25 @@ function PositionCard({
           </div>
 
           {/* Value row */}
-          <div className="grid grid-cols-2 gap-4 mb-5">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 mb-4 md:mb-5">
             <div
-              className="rounded-2xl p-3.5"
+              className="rounded-xl md:rounded-2xl p-3"
               style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
             >
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-1">Invested</p>
-              <p className="text-base font-black text-amber-400">{fmtINR(pos.investedValue)}</p>
+              <p className="text-sm md:text-base font-black text-amber-400">{fmtINR(pos.investedValue)}</p>
             </div>
             <div
-              className="rounded-2xl p-3.5"
+              className="rounded-xl md:rounded-2xl p-3"
               style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}
             >
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-1">Current Value</p>
-              <p className="text-base font-black text-white">{fmtINR(pos.currentValue)}</p>
+              <p className="text-sm md:text-base font-black text-white">{fmtINR(pos.currentValue)}</p>
             </div>
           </div>
 
           {/* P&L + actions row */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center justify-between gap-2 md:gap-3 flex-wrap">
             {/* P&L */}
             <motion.div
               className={cn(
@@ -756,7 +756,7 @@ function PositionCard({
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-400 border border-rose-400/25 hover:bg-rose-400/10 hover:border-rose-400/40 transition-all duration-200"
+              className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-2xl text-[10px] font-black uppercase tracking-widest text-rose-400 border border-rose-400/25 hover:bg-rose-400/10 hover:border-rose-400/40 transition-all duration-200"
               aria-label={`See tax breakdown for ${pos.symbol}`}
             >
               <Receipt size={13} strokeWidth={2.5} />
@@ -1012,7 +1012,7 @@ function AddPositionForm({ onAdd }: { onAdd: (pos: Position) => void }) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="flex items-center gap-2.5 px-6 py-3.5 bg-amber-500 text-black font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-amber-400 transition-colors duration-200 shadow-lg shadow-amber-500/20 relative overflow-hidden"
+          className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 bg-amber-500 text-black font-black text-[11px] uppercase tracking-widest rounded-2xl hover:bg-amber-400 transition-colors duration-200 shadow-lg shadow-amber-500/20 relative overflow-hidden"
         >
           {/* Button shimmer */}
           <motion.div
@@ -1054,7 +1054,7 @@ function TaxRefCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
-      <GlassCard hover className="p-6 h-full">
+      <GlassCard hover className="p-5 md:p-6 h-full">
         <div
           className="w-10 h-10 rounded-2xl flex items-center justify-center mb-4"
           style={{ background: `${color}15`, border: `1px solid ${color}25` }}
@@ -1277,7 +1277,7 @@ export default function PortfolioPage() {
           <div className="flex items-center gap-3 mb-3">
             <SectionLabel>Portfolio</SectionLabel>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white leading-none mb-2">
+          <h1 className="text-3xl sm:text-5xl font-black text-white leading-none mb-2">
             Your Portfolio
           </h1>
           <p className="text-sm text-slate-500 font-semibold">
@@ -1286,7 +1286,7 @@ export default function PortfolioPage() {
         </motion.div>
 
         {/* ── Summary Cards ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
           <SummaryCard
             label="Total Invested"
             value={fmtINR(summary.totalInvested)}
@@ -1356,7 +1356,7 @@ export default function PortfolioPage() {
                 exit={{ opacity: 0 }}
                 key="empty"
               >
-                <GlassCard className="p-12 flex flex-col items-center justify-center text-center">
+                <GlassCard className="p-8 md:p-12 flex flex-col items-center justify-center text-center">
                   <div
                     className="w-16 h-16 rounded-3xl flex items-center justify-center mb-4"
                     style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}
@@ -1392,7 +1392,7 @@ export default function PortfolioPage() {
           <div className="mb-5">
             <SectionLabel>Indian Tax Guide (Budget 2024)</SectionLabel>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             <TaxRefCard
               title="STT"
               rate="0.1%"

@@ -140,13 +140,13 @@ export default function GyanHubPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 200, damping: 30 }}
-            className="text-center mb-20"
+            className="text-center mb-12 md:mb-20"
           >
-            <div className="inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-full mb-8">
+            <div className="inline-flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 px-3 md:px-4 py-2 rounded-full mb-6 md:mb-8">
               <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
               <span className="text-[10px] font-black text-yellow-500 uppercase tracking-[0.25em]">Knowledge Protocol Active</span>
             </div>
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-white mb-6">
+            <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-white mb-4 md:mb-6">
               Gyan<span className="text-yellow-500">Hub</span>
             </h1>
             <p className="text-lg md:text-xl font-bold text-slate-400 max-w-2xl mx-auto leading-relaxed">
@@ -162,7 +162,7 @@ export default function GyanHubPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-24"
+            className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-16 md:mb-24"
           >
             {FEATURES.map((feature) => {
               const colors = accentMap[feature.accent];
@@ -171,7 +171,7 @@ export default function GyanHubPage() {
                 <motion.div key={feature.title} variants={itemVariants}>
                   <Link href={feature.href} className="block group">
                     <div className={cn(
-                      "bg-white/[0.02] backdrop-blur-2xl rounded-[2.5rem] p-8 md:p-10 border border-white/10",
+                      "bg-white/[0.02] backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-6 md:p-10 border border-white/10",
                       "shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] hover:border-white/20 transition-all",
                       "hover:bg-white/[0.04] relative overflow-hidden"
                     )}>
@@ -202,10 +202,10 @@ export default function GyanHubPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, type: 'spring', stiffness: 200, damping: 30 }}
-            className="mb-16"
+            className="mb-10 md:mb-16"
           >
             <Link href="/gyanhub/learn" className="block group">
-              <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 backdrop-blur-2xl rounded-[2.5rem] p-8 md:p-10 border border-yellow-500/20 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] hover:border-yellow-500/40 transition-all relative overflow-hidden">
+              <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-6 md:p-10 border border-yellow-500/20 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] hover:border-yellow-500/40 transition-all relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-60 h-60 bg-yellow-500/10 rounded-full blur-[100px] -mr-30 -mt-30 pointer-events-none" />
                 <div className="relative z-10">
                   <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -224,7 +224,7 @@ export default function GyanHubPage() {
                       <p className="text-sm text-slate-400 font-medium mb-4">
                         {TOTAL_CHAPTERS} Chapters &middot; Beginner to Pro &middot; Free
                       </p>
-                      <div className="flex gap-2 mb-6">
+                      <div className="flex flex-wrap gap-2 mb-6">
                         {['Beginner', 'Intermediate', 'Advanced', 'Pro'].map((level) => (
                           <span
                             key={level}
@@ -270,17 +270,17 @@ export default function GyanHubPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35, type: 'spring', stiffness: 200, damping: 30 }}
-            className="mb-24"
+            className="mb-12 md:mb-24"
           >
             <div className="flex items-center gap-3 mb-6 px-2">
               <TrendingUp size={14} className="text-yellow-500" />
               <h2 className="text-sm font-black text-white uppercase tracking-widest">Did You Know?</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               {QUICK_STATS.map((stat) => (
                 <div
                   key={stat.label}
-                  className="bg-white/[0.02] backdrop-blur-2xl rounded-[2rem] p-6 border border-white/10 shadow-sm"
+                  className="bg-white/[0.02] backdrop-blur-2xl rounded-2xl md:rounded-[2rem] p-5 md:p-6 border border-white/10 shadow-sm"
                 >
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                     {stat.label}
@@ -304,10 +304,10 @@ export default function GyanHubPage() {
                 View All <ChevronRight size={12} strokeWidth={3} />
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {FEATURED_ARTICLES.map((article) => (
                 <Link key={article.slug} href={`/gyanhub/articles/${article.slug}`} className="group">
-                  <div className="bg-white/[0.02] backdrop-blur-2xl rounded-[2.5rem] p-8 border border-white/10 shadow-sm hover:border-yellow-500/30 hover:bg-white/[0.04] transition-all h-full flex flex-col justify-between">
+                  <div className="bg-white/[0.02] backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-6 md:p-8 border border-white/10 shadow-sm hover:border-yellow-500/30 hover:bg-white/[0.04] transition-all h-full flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-3 mb-4">
                         <span className={cn("text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-[0.15em] border", categoryColors[article.category] || 'bg-white/5 text-slate-400 border-white/10')}>
@@ -338,7 +338,7 @@ export default function GyanHubPage() {
         </main>
 
         {/* Footer */}
-        <footer className="max-w-7xl mx-auto mt-24 p-12 border-t border-white/10 text-center relative z-10">
+        <footer className="max-w-7xl mx-auto mt-12 md:mt-24 px-4 py-8 md:p-12 border-t border-white/10 text-center relative z-10">
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
             GyanHub by GallaGyan — Educational Purpose Only. Not Financial Advice.
           </p>
