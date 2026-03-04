@@ -18,8 +18,6 @@ import logging
 import auth
 from models import db
 from dotenv import load_dotenv
-from app.api.v1.router import api_router
-
 load_dotenv()
 
 # Structured logging
@@ -167,7 +165,6 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
-app.include_router(api_router)
 
 
 def validate_ticker(ticker: str) -> str:
