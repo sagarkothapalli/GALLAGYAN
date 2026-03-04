@@ -78,23 +78,42 @@ SECTOR_PEERS = {
 
 def _fetch_fast_info(symbol: str) -> Optional[dict]:
     """Fetch price data for a single symbol using yfinance fast_info.
+    Falls back to history() for indices where fast_info may not populate.
     Returns a normalised dict or None on failure."""
     try:
         fi = yf.Ticker(symbol).fast_info
         price = fi.last_price
         if price is None or price == 0:
-            return None
+            raise ValueError("fast_info returned no price")
         prev_close = fi.regular_market_previous_close or price
         change = round(price - prev_close, 2)
         pct_change = round((price - prev_close) / prev_close * 100, 2) if prev_close else 0.0
         return {
-            "price": price,
+            "price": round(price, 2),
             "change": change,
             "percent_change": pct_change,
-            "market_cap": fi.market_cap,
+            "market_cap": getattr(fi, 'market_cap', None),
+        }
+    except Exception:
+        pass
+
+    # Fallback: use recent history (more reliable for index symbols)
+    try:
+        hist = yf.Ticker(symbol).history(period="2d", interval="1d")
+        if hist.empty or len(hist) < 1:
+            return None
+        price = float(hist["Close"].iloc[-1])
+        prev_close = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else price
+        change = round(price - prev_close, 2)
+        pct_change = round((price - prev_close) / prev_close * 100, 2) if prev_close else 0.0
+        return {
+            "price": round(price, 2),
+            "change": change,
+            "percent_change": pct_change,
+            "market_cap": None,
         }
     except Exception as e:
-        logger.debug(f"fast_info failed for {symbol}: {e}")
+        logger.debug(f"Both fast_info and history failed for {symbol}: {e}")
         return None
 
 
@@ -109,11 +128,24 @@ async def refresh_market_data():
     await asyncio.sleep(1)  # Let the server start fully before first fetch
     while True:
         try:
-            all_syms = INDEX_SYMBOLS + list(SECTOR_MAP.keys()) + HOT_STOCKS
+            # Deduplicate while preserving order
+            seen: set = set()
+            all_syms: list = []
+            for s in INDEX_SYMBOLS + list(SECTOR_MAP.keys()) + HOT_STOCKS:
+                if s not in seen:
+                    seen.add(s)
+                    all_syms.append(s)
 
-            # Fetch each ticker individually and concurrently for reliability
-            tasks = [_async_fast_info(sym) for sym in all_syms]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Fetch in batches of 5 to avoid rate limits
+            results: list = []
+            batch_size = 5
+            for i in range(0, len(all_syms), batch_size):
+                batch = all_syms[i:i + batch_size]
+                tasks = [_async_fast_info(sym) for sym in batch]
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                results.extend(batch_results)
+                if i + batch_size < len(all_syms):
+                    await asyncio.sleep(0.5)
 
             # Build a lookup dict: symbol -> fast_info dict
             p_data: dict[str, dict] = {}
@@ -151,11 +183,7 @@ async def refresh_market_data():
                 p = p_data.get(sym)
                 if p:
                     clean_sym = sym.replace('.NS', '')
-                    # Attempt to get the long name from fast_info; fall back to clean symbol
-                    try:
-                        long_name = yf.Ticker(sym).fast_info.get('longName') or clean_sym
-                    except Exception:
-                        long_name = clean_sym
+                    long_name = clean_sym  # fast_info doesn't expose longName; use symbol
                     STOCK_DETAIL_CACHE[clean_sym] = {
                         "symbol": sym,
                         "name": long_name,
