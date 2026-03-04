@@ -6,7 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from yahooquery import Ticker, search
+import yfinance as yf
 from datetime import datetime, timedelta
 import re
 import random
@@ -76,47 +76,93 @@ SECTOR_PEERS = {
 }
 
 
+def _fetch_fast_info(symbol: str) -> Optional[dict]:
+    """Fetch price data for a single symbol using yfinance fast_info.
+    Returns a normalised dict or None on failure."""
+    try:
+        fi = yf.Ticker(symbol).fast_info
+        price = fi.last_price
+        if price is None or price == 0:
+            return None
+        prev_close = fi.regular_market_previous_close or price
+        change = round(price - prev_close, 2)
+        pct_change = round((price - prev_close) / prev_close * 100, 2) if prev_close else 0.0
+        return {
+            "price": price,
+            "change": change,
+            "percent_change": pct_change,
+            "market_cap": fi.market_cap,
+        }
+    except Exception as e:
+        logger.debug(f"fast_info failed for {symbol}: {e}")
+        return None
+
+
+async def _async_fast_info(symbol: str) -> tuple[str, Optional[dict]]:
+    """Async wrapper around _fetch_fast_info returning (symbol, data)."""
+    data = await asyncio.to_thread(_fetch_fast_info, symbol)
+    return symbol, data
+
+
 async def refresh_market_data():
     """Background engine keeping market data ready in memory."""
     await asyncio.sleep(1)  # Let the server start fully before first fetch
     while True:
         try:
             all_syms = INDEX_SYMBOLS + list(SECTOR_MAP.keys()) + HOT_STOCKS
-            t = await asyncio.wait_for(asyncio.to_thread(Ticker, all_syms), timeout=30)
-            p_data = t.price
+
+            # Fetch each ticker individually and concurrently for reliability
+            tasks = [_async_fast_info(sym) for sym in all_syms]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Build a lookup dict: symbol -> fast_info dict
+            p_data: dict[str, dict] = {}
+            for result in results:
+                if isinstance(result, Exception):
+                    continue
+                sym, data = result
+                if data:
+                    p_data[sym] = data
 
             # 1. Update Indices
             new_indices = []
             for idx in INDEX_SYMBOLS:
-                p = p_data.get(idx, {})
+                p = p_data.get(idx)
                 if p:
                     new_indices.append({
                         "symbol": "NIFTY 50" if idx == "^NSEI" else "SENSEX",
-                        "price": p.get("regularMarketPrice"),
-                        "percent_change": round(p.get("regularMarketChangePercent", 0) * 100, 2)
+                        "price": p["price"],
+                        "percent_change": p["percent_change"]
                     })
 
             # 2. Update Sectors
             new_sectors = []
             for sym, name in SECTOR_MAP.items():
-                p = p_data.get(sym, {})
-                if p and p.get('regularMarketPrice'):
+                p = p_data.get(sym)
+                if p:
                     new_sectors.append({
-                        "symbol": sym, "name": name, "price": p.get('regularMarketPrice'),
-                        "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2)
+                        "symbol": sym, "name": name,
+                        "price": p["price"],
+                        "percent_change": p["percent_change"]
                     })
 
             # 3. Update Hot Stocks in Detail Cache
             for sym in HOT_STOCKS:
-                p = p_data.get(sym, {})
-                if p and p.get('regularMarketPrice'):
+                p = p_data.get(sym)
+                if p:
                     clean_sym = sym.replace('.NS', '')
+                    # Attempt to get the long name from fast_info; fall back to clean symbol
+                    try:
+                        long_name = yf.Ticker(sym).fast_info.get('longName') or clean_sym
+                    except Exception:
+                        long_name = clean_sym
                     STOCK_DETAIL_CACHE[clean_sym] = {
-                        "symbol": sym, "name": p.get('longName') or clean_sym,
-                        "price": p.get('regularMarketPrice'),
-                        "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2),
-                        "change": round(p.get('regularMarketChange', 0), 2),
-                        "market_cap": p.get('marketCap')
+                        "symbol": sym,
+                        "name": long_name,
+                        "price": p["price"],
+                        "percent_change": p["percent_change"],
+                        "change": p["change"],
+                        "market_cap": p["market_cap"]
                     }
 
             GLOBAL_MARKET_CACHE["indices"] = new_indices
@@ -134,7 +180,7 @@ async def refresh_market_data():
 async def lifespan(app: FastAPI):
     """App lifespan — start background refresh task on startup."""
     logger.info("GallaGyan API starting up")
-    
+
     # Initialize database and default user
     from models import init_db
     try:
@@ -202,9 +248,12 @@ async def get_suggestions(request: Request, query: str = ""):
     if len(query) < 2:
         return []
     try:
-        results = await asyncio.to_thread(search, f"{query} NSE")
+        def _search():
+            return yf.Search(f"{query} NSE", news_count=0, quotes_count=10).quotes
+
+        raw_quotes = await asyncio.to_thread(_search)
         quotes = []
-        for q in results.get('quotes', []):
+        for q in (raw_quotes or []):
             sym = q.get('symbol', '')
             if sym.endswith('.NS') or sym.endswith('.BO'):
                 quotes.append({
@@ -226,25 +275,54 @@ async def get_stock(request: Request, ticker: str):
         return STOCK_DETAIL_CACHE[ticker]
 
     try:
+        # Try .NS first, fall back to .BO
         sym = f"{ticker}.NS"
-        t = await asyncio.to_thread(Ticker, [sym, f"{ticker}.BO"])
-        p_data = t.price
-        p = p_data.get(sym, p_data.get(f"{ticker}.BO", {}))
+        bo_sym = f"{ticker}.BO"
 
-        if not p or not p.get('regularMarketPrice'):
+        def _fetch_stock():
+            # Try NS exchange first
+            t = yf.Ticker(sym)
+            fi = t.fast_info
+            price = fi.last_price
+            used_sym = sym
+
+            if not price:
+                t = yf.Ticker(bo_sym)
+                fi = t.fast_info
+                price = fi.last_price
+                used_sym = bo_sym
+
+            if not price:
+                return None, None, None
+
+            prev_close = fi.regular_market_previous_close or price
+            change = round(price - prev_close, 2)
+            pct_change = round((price - prev_close) / prev_close * 100, 2) if prev_close else 0.0
+
+            # Full info for PE ratio and 52-week data (slightly slower but complete)
+            info = t.info or {}
+            return used_sym, {
+                "price": price,
+                "change": change,
+                "percent_change": pct_change,
+                "market_cap": fi.market_cap,
+            }, info
+
+        used_sym, price_data, info = await asyncio.to_thread(_fetch_stock)
+
+        if not price_data:
             raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found")
 
-        summary = t.summary_detail.get(sym, t.summary_detail.get(f"{ticker}.BO", {}))
         res = {
-            "symbol": sym if sym in p_data else f"{ticker}.BO",
-            "name": p.get('longName') or ticker,
-            "price": p.get('regularMarketPrice'),
-            "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2),
-            "change": round(p.get('regularMarketChange', 0), 2),
-            "market_cap": p.get('marketCap'),
-            "pe_ratio": summary.get('trailingPE'),
-            "fiftyTwoWeekHigh": summary.get('fiftyTwoWeekHigh'),
-            "fiftyTwoWeekLow": summary.get('fiftyTwoWeekLow')
+            "symbol": used_sym,
+            "name": info.get('longName') or ticker,
+            "price": price_data["price"],
+            "percent_change": price_data["percent_change"],
+            "change": price_data["change"],
+            "market_cap": price_data["market_cap"],
+            "pe_ratio": info.get('trailingPE'),
+            "fiftyTwoWeekHigh": info.get('fiftyTwoWeekHigh'),
+            "fiftyTwoWeekLow": info.get('fiftyTwoWeekLow')
         }
         STOCK_DETAIL_CACHE[ticker] = res
         return res
@@ -273,22 +351,43 @@ async def get_history(request: Request, ticker: str, period: str = "1mo", interv
 
     sym = ticker if "." in ticker else f"{ticker}.NS"
     try:
-        t = await asyncio.to_thread(Ticker, sym)
-        df = t.history(period=period, interval=interval)
+        def _fetch_history():
+            t = yf.Ticker(sym)
+            return t.history(period=period, interval=interval)
+
+        df = await asyncio.to_thread(_fetch_history)
         if df is None or (hasattr(df, 'empty') and df.empty):
             return []
 
         history = []
         df = df.reset_index()
-        date_col = 'date' if 'date' in df.columns else 'datetime'
+        # yfinance uses 'Datetime' for intraday and 'Date' for daily intervals
+        if 'Datetime' in df.columns:
+            date_col = 'Datetime'
+        elif 'Date' in df.columns:
+            date_col = 'Date'
+        else:
+            # Fallback: use the first column as the date column
+            date_col = df.columns[0]
+
         for _, row in df.iterrows():
             ts = row[date_col]
-            time_str = ts.strftime('%Y-%m-%d %H:%M') if hasattr(ts, 'hour') and ts.hour > 0 else ts.strftime('%Y-%m-%d')
+            # Format: include time component only for intraday data
+            try:
+                if hasattr(ts, 'hour') and ts.hour > 0:
+                    time_str = ts.strftime('%Y-%m-%d %H:%M')
+                else:
+                    time_str = ts.strftime('%Y-%m-%d')
+            except Exception:
+                time_str = str(ts)[:16]
+
             history.append({
                 "time": time_str,
-                "open": round(row['open'], 2), "high": round(row['high'], 2),
-                "low": round(row['low'], 2), "close": round(row['close'], 2),
-                "volume": int(row['volume']) if 'volume' in df.columns else 0
+                "open": round(float(row['Open']), 2),
+                "high": round(float(row['High']), 2),
+                "low": round(float(row['Low']), 2),
+                "close": round(float(row['Close']), 2),
+                "volume": int(row['Volume']) if 'Volume' in df.columns else 0
             })
         HISTORY_CACHE[cache_key] = history
         return history
@@ -307,9 +406,12 @@ async def get_peers(request: Request, ticker: str):
 
     try:
         sym = f"{ticker}.NS"
-        t = await asyncio.to_thread(Ticker, sym)
-        profile = t.asset_profile.get(sym, {})
-        sector = profile.get("sector") if isinstance(profile, dict) else None
+
+        def _fetch_sector():
+            info = yf.Ticker(sym).info or {}
+            return info.get('sector')
+
+        sector = await asyncio.to_thread(_fetch_sector)
 
         # Find sector peers; fall back to Nifty 50 blue chips
         if sector and sector in SECTOR_PEERS:
@@ -317,20 +419,27 @@ async def get_peers(request: Request, ticker: str):
         else:
             peer_symbols = [s for s in ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"] if s != ticker][:5]
 
-        # Fetch current prices for peers
+        # Fetch current prices for peers concurrently
         ns_syms = [f"{s}.NS" for s in peer_symbols]
-        pt = await asyncio.to_thread(Ticker, ns_syms)
-        p_data = pt.price
+        peer_tasks = [_async_fast_info(ns) for ns in ns_syms]
+        peer_results = await asyncio.gather(*peer_tasks, return_exceptions=True)
 
         peers = []
-        for s, ns in zip(peer_symbols, ns_syms):
-            p = p_data.get(ns, {})
-            if p and p.get('regularMarketPrice'):
+        for s, result in zip(peer_symbols, peer_results):
+            if isinstance(result, Exception):
+                continue
+            ns_sym, p = result
+            if p:
+                # Get the long name from info if possible; fall back to symbol
+                try:
+                    long_name = yf.Ticker(ns_sym).fast_info.get('longName') or s
+                except Exception:
+                    long_name = s
                 peers.append({
                     "symbol": s,
-                    "name": p.get('longName') or s,
-                    "price": p.get('regularMarketPrice'),
-                    "percent_change": round(p.get('regularMarketChangePercent', 0) * 100, 2)
+                    "name": long_name,
+                    "price": p["price"],
+                    "percent_change": p["percent_change"]
                 })
 
         result = {"sector": sector or "Unknown", "peers": peers}
@@ -351,11 +460,16 @@ async def get_news(request: Request, ticker: str):
 
     try:
         sym = f"{ticker}.NS"
-        t = await asyncio.to_thread(Ticker, sym)
-        raw_news = t.news(count=10)
+
+        def _fetch_news():
+            # yfinance Ticker.news is a property (list), not a method
+            return yf.Ticker(sym).news or []
+
+        raw_news = await asyncio.to_thread(_fetch_news)
 
         articles = []
         for item in (raw_news or []):
+            # yfinance news dicts use the same keys as yahooquery
             articles.append({
                 "title": item.get("title", ""),
                 "publisher": item.get("publisher", ""),
