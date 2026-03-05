@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
+import BottomNav from "@/components/BottomNav";
+import PageTransitionWrapper from "@/components/PageTransitionWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -143,7 +145,14 @@ export default function RootLayout({
             </p>
           </div>
         </div>
-        {children}
+        {/* Page content with bottom padding on mobile for nav bar */}
+        <PageTransitionWrapper>
+          <div className="pb-[68px] md:pb-0">
+            {children}
+          </div>
+        </PageTransitionWrapper>
+        {/* Persistent liquid glass bottom nav — visible on all pages on mobile */}
+        <BottomNav />
       </body>
     </html>
   );

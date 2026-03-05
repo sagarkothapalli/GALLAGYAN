@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Zap, ShieldCheck, AlertTriangle, BarChart2, BookOpen, Briefcase } from 'lucide-react';
+import { ChevronRight, Zap, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAuthToken, getStoredUser, authFetch, logout as logoutUser } from '@/lib/auth';
 
@@ -536,7 +536,7 @@ export default function Home() {
 
   return (
     <div className="dark">
-      <div className="min-h-screen relative overflow-hidden bg-[#050505] text-slate-100 font-sans transition-colors duration-1000 pb-16 md:pb-0">
+      <div className="min-h-screen relative overflow-hidden bg-[#050505] text-slate-100 font-sans transition-colors duration-1000">
 
         {/* Immersive Ambient Lighting */}
         <div className="fixed inset-0 z-0 pointer-events-none">
@@ -1251,26 +1251,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Mobile Bottom Navigation — md:hidden so it only shows on phones */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/10"
-        style={{ background: 'rgba(5,5,5,0.95)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
-      >
-        <div className="flex items-center justify-around h-16 px-2">
-          <Link href="/" className="flex flex-col items-center gap-1 flex-1 py-2 text-amber-400">
-            <BarChart2 size={20} strokeWidth={2.5} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Market</span>
-          </Link>
-          <Link href="/gyanhub" className="flex flex-col items-center gap-1 flex-1 py-2 text-slate-400 hover:text-yellow-500 transition-colors">
-            <BookOpen size={20} strokeWidth={2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">GyanHub</span>
-          </Link>
-          <Link href="/portfolio" className="flex flex-col items-center gap-1 flex-1 py-2 text-slate-400 hover:text-yellow-500 transition-colors">
-            <Briefcase size={20} strokeWidth={2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Portfolio</span>
-          </Link>
-        </div>
-      </nav>
 
       <style jsx global>{`
         body { background-color: #050505; color: #f8fafc; }
